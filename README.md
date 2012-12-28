@@ -2,7 +2,7 @@
 
 Lango is a compilation of tools for programming language functions.
 
-## Environmen
+## Environment
 ### symtab
 symtab.c contains functions that run a symbol table with chaining.
 It uses Paul Hsieh's SuperFasterHash hash function. 

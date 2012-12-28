@@ -312,8 +312,8 @@ void addobject(char * content)
 	Also adds the object in 'content' if the entry doesn't already exist.
 */
 meta_t scanoradd(char * string,		// Var name
-		   meta_t type,					// Type of variable (POINT)
-		   char * content)				// Object content
+		   meta_t type,				// Type of variable (POINT)
+		   char * content)			// Object content
 {
 	int bucket = lookup_bucket(string);
 
