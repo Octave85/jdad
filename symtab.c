@@ -373,19 +373,14 @@ int main(int argc, char **argv)
 
 	object foundobj;
 
-	hash_entry = scanoradd("a", TYPE_INT, "123");
-	foundobj = memory[geta(hash_entry)];
-	printf("(a -> %d) := ",  
-		geta(hash_entry));
-	printval(memory[geta(hash_entry)]);
-	putchar('\n');
-
-	hash_entry = scanoradd("b", TYPE_STRING, "\"123\"");
-	foundobj = memory[geta(hash_entry)];
-	printf("(b -> %d) := ",  
-		geta(hash_entry));	
-	printval(memory[geta(hash_entry)]);
-	putchar('\n');
+	while (val_addr++ < 1000)
+	{
+		hash_entry = scanoradd("a", TYPE_INT, "123");
+		foundobj = memory[geta(hash_entry)];
+		
+		hash_entry = scanoradd("b", TYPE_STRING, "\"123\"");
+		foundobj = memory[geta(hash_entry)];
+	}
 
 	/*printf("Enter a word to add it\n");
 	while (1)
