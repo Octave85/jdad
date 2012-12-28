@@ -73,6 +73,7 @@ int rem;
 
 typedef uint32_t meta_t;
 
+// Memory object
 typedef struct
 {
 	meta_t metadata;	// Address, type
@@ -85,22 +86,38 @@ typedef struct
 	} value;
 } object;
 
-// Linked-list member
-struct entry_t_st
+// Stack layer (linked list member)
+struct layer_t_st
 {
-	meta_t metadata;	// Address, type
-	char *name;
-	struct entry_t_st *next;
+	meta_t metadata;
+	struct layer_t_st *next;
 };
 
-typedef struct entry_t_st entry_t;
+typedef struct layer_t_st layer_t;
+
+// Linked-list member, stack (name)
+struct scopestack_t_st
+{
+	char *name;
+	layer_t *head;	// Head of the scope stack
+	struct scopestack_t_st *next;
+};
+
+typedef struct scopestack_t_st scopestack_t;
+
+// Independent entry - name and metadata only
+typedef struct 
+{
+	char *name;
+	meta_t metadata;
+} entry_t;
 
 // Linked-list container
 typedef struct 
 {
 	unsigned int hash;
-	entry_t *first;
-	entry_t *last;
+	scopestack_t *first;
+	scopestack_t *last;
 } bucket_t;
 
 
@@ -210,12 +227,14 @@ int lookup_bucket(char *name)
 	return i;
 }
 
-entry_t * lookup_entry(char * name, int bucket)
+meta_t lookup_entry(char * name, int bucket)
 {
 	if (hashtable[bucket].first == SENTINEL)
-		return SENTINEL;
+	{
+		return 0;
+	}
 
-	entry_t * cur = hashtable[bucket].first;
+	scopestack_t * cur = hashtable[bucket].first;
 
 	while (strcmp(name, cur->name))
 	{
@@ -224,13 +243,33 @@ entry_t * lookup_entry(char * name, int bucket)
 			break;		
 	}
 
-	return cur;
+	return cur->head->metadata;
 }
 
-meta_t typeifier(char * content)
+void push_scope(scopestack_t * entry, meta_t data)
 {
+	layer_t *newhead = malloc(sizeof(layer_t));
 
+	newhead->metadata = data;
+
+	newhead->next = entry->head;
+
+	entry->head = newhead;
 }
+
+meta_t pop_scope(scopestack_t *entry)
+{
+	layer_t *oldhead = entry->head;
+
+	meta_t data = oldhead->metadata;
+
+	entry->head = oldhead->next;
+
+	free(oldhead);
+
+	return data;
+}
+
 
 void addobject(char * content) 
 {
@@ -240,14 +279,11 @@ void addobject(char * content)
 
 	long longval;
 
-	printf("Addobject\n");
-
 	longval = strtol(content, &content, 0);
 
 	if (content[0] == '\0')
 	{
 		getint(newobject) = longval;
-		printf("Got long: %d\n", longval);
 		type = TYPE_INT;
 	}
 	else if (strchr(content, '"'))
@@ -275,25 +311,28 @@ void addobject(char * content)
 	and returns either the address of the found entry or the newly-added one.
 	Also adds the object in 'content' if the entry doesn't already exist.
 */
-entry_t * scanoradd(char * string,		// Var name
+meta_t scanoradd(char * string,		// Var name
 		   meta_t type,					// Type of variable (POINT)
 		   char * content)				// Object content
 {
 	int bucket = lookup_bucket(string);
 
-	printf("Got bucket %d\n", bucket);
+	meta_t entry = lookup_entry(string, bucket);
 
-	entry_t * entry = lookup_entry(string, bucket);
-
-	if (entry == SENTINEL) // Not found...
+	if (entry == 0) // Not found...
 	{
-		printf("Not found...\n");
-
-		entry_t *newentry = malloc(sizeof(entry_t));
+		// Allocate new stack for the new name
+		scopestack_t *newentry = malloc(sizeof(scopestack_t));
+		// Allocate new space for this particular instance of the name
+		layer_t *newscope = malloc(sizeof(layer_t));
 
 		newentry->name = string;
-		newentry->metadata = 
+
+		newentry->head = newscope;
+		newentry->head->metadata = 
 			makemetadata(newmem, type, 1, FLAG_SET);
+		newentry->head->next = SENTINEL;
+		
 		newentry->next = SENTINEL;
 
 		// Check if this bucket has anything in it
@@ -312,7 +351,7 @@ entry_t * scanoradd(char * string,		// Var name
 
 		newmem++; newbucket++;
 
-		return newentry;
+		return newentry->head->metadata;
 	}
 
 	return entry;
@@ -325,18 +364,30 @@ int main(int argc, char **argv)
 	memset(hashtable, 0, BUCKETS * sizeof(bucket_t));
 
 
-	char *varname	= malloc(50);
-	char *val	= malloc(50);
-	//meta_t curbucket = 0;
-	//meta_t curmem    = 0;
-
+	//char *varname	= malloc(50);
+	//char *val	= malloc(50);
+	
 	unsigned int val_addr  = 0;
 
-	entry_t *hash_entry;
+	meta_t hash_entry;
 
 	object foundobj;
 
-	printf("Enter a word to add it\n");
+	hash_entry = scanoradd("a", TYPE_INT, "123");
+	foundobj = memory[geta(hash_entry)];
+	printf("(a -> %d) := ",  
+		geta(hash_entry));
+	printval(memory[geta(hash_entry)]);
+	putchar('\n');
+
+	hash_entry = scanoradd("b", TYPE_STRING, "\"123\"");
+	foundobj = memory[geta(hash_entry)];
+	printf("(b -> %d) := ",  
+		geta(hash_entry));	
+	printval(memory[geta(hash_entry)]);
+	putchar('\n');
+
+	/*printf("Enter a word to add it\n");
 	while (1)
 	{
 		printf("%d>> ", newmem);
@@ -347,14 +398,16 @@ int main(int argc, char **argv)
 				  	 TYPE_POINT,
 				  	 val);
 
-		foundobj = memory[geta(hash_entry->metadata)];
+		foundobj = memory[geta(hash_entry)];
 
 		printf("(%s -> %d) := ", 
 			varname, 
-			geta(hash_entry->metadata));
+			geta(hash_entry));
 
 		printval(foundobj);
 		putchar('\n');
 		putchar('\n');
-	}
+	}*/
+
+	return 0;
 }
