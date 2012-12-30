@@ -73,18 +73,20 @@ int rem;
 
 typedef uint32_t meta_t;
 
-// Memory object
-typedef struct
-{
-	meta_t metadata;	// Address, type
-	union
-	{
-		char	*string;
-		long	integer;
-		double	fp;
-		void	*data;
-	} value;
-} object;
+
+/* Hash table is organized like this:
+bucket_t[BUCKETS] hashtable		Full table contains: All entries
+
+bucket_t hashtable[n] = 		Single element of hashtable has:
+	nament_t[m] entries		All entries w/same hash value mod BUCKETS
+								m = count of entries with that hash value
+nament_t entry 				All entries with that same name
+								HEAD of this will have the sought-after value.
+
+In summary, the hashtable is an array of lists of lists. 
+The final lists represent different uses (scopes) of that name, 
+or symbols of different types with that name.
+*/
 
 // Stack layer (linked list member)
 struct layer_t_st
@@ -96,14 +98,14 @@ struct layer_t_st
 typedef struct layer_t_st layer_t;
 
 // Linked-list member, stack (name)
-struct scopestack_t_st
+struct nament_t_st
 {
 	char *name;
-	layer_t *head;	// Head of the scope stack
-	struct scopestack_t_st *next;
+	layer_t *head;	// Head of the layer stack
+	struct nament_t_st *next;
 };
 
-typedef struct scopestack_t_st scopestack_t;
+typedef struct nament_t_st nament_t;
 
 // Independent entry - name and metadata only
 typedef struct 
@@ -116,8 +118,8 @@ typedef struct
 typedef struct 
 {
 	unsigned int hash;
-	scopestack_t *first;
-	scopestack_t *last;
+	nament_t *first;
+	nament_t *last;
 } bucket_t;
 
 
@@ -130,14 +132,15 @@ typedef struct
 #define META_BITS_POIN	0x00000ff0
 #define META_BITS_FLAG	0x0000000f
 
-#define TYPE_STRING	1
-#define TYPE_INT	2
-#define TYPE_FP		4
+#define TYPE_UNKNOWN 0
+#define TYPE_STRING	 1
+#define TYPE_INT	 2
+#define TYPE_FP		 4
 
-#define TYPE_POINT	8
-#define TYPE_LIST	16
+#define TYPE_POINT	 8
+#define TYPE_LIST	 16
 
-#define FLAG_SET	1
+#define FLAG_SET	 1
 
 /* Metadata format:
 ** 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32
@@ -167,9 +170,24 @@ typedef struct
 #define getdoub(ob) (ob.value.fp)
 
 
-object memory[MEMROWS];
+// Macro for a hashtable lookup. 
+// Returns a pointer to the name entry specified by str.
+#define getentry(str) (lookup_entry(str, lookup_bucket(str)))
 
-unsigned int newmem;			// Lowest mem row with no value
+// Function-making macro. Takes a condition ('cur' contains current layer)
+// and a name for the function, and makes a function that loops through
+// all the layers in a given name entry until condition is true.
+#define findwherefun(cond, name) \
+	layer_t * name(nament_t * nament)	 \
+	{	\
+		layer_t *cur = nament->head; 	 \
+		while ( ! ((cur == SENTINEL) || (cond))) \
+		{	\
+			cur = cur->next;			 \
+		}	\
+		return cur;						 \
+	}
+
 
 bucket_t hashtable[BUCKETS];
 
@@ -192,49 +210,19 @@ void printval(object inquestion)
 	}
 }	
 
-/*	These support multiple columns in each memory row, not needed right now
-meta_t getnewestobject(meta_t row)
+unsigned int lookup_bucket(char *name)
 {
-	if ( ! getset(memory[row][0].metadata)) return 0;
-
-	int i;
-	for (i = 0; i < MEMCOLS; i++)
-		if ( ! getset(memory[row][i].metadata))
-			return (i - 1);
+	return SuperFastHash(name, strlen(name)) % BUCKETS;
 }
 
-object lookup(entry_t key)
-{
-	return memory[geta(key.metadata)]
-	  [getnewestobject(geta(key.metadata))];
-}*/
-
-int lookup_bucket(char *name)
-{
-	unsigned int key = SuperFastHash(name, strlen(name));
-	int i = 0;
-
-	// Look for the bucket with a matching hash.
-	// If not found, return the current index.
-	for(i; i < newbucket; i++)
-		if (hashtable[i].hash == key)
-			break;
-
-	// Set the found bucket (whether it had a hash before or not)
-	// to our name's hash.
-	hashtable[i].hash = key;
-
-	return i;
-}
-
-meta_t lookup_entry(char * name, int bucket)
+nament_t * lookup_entry(char * name, int bucket)
 {
 	if (hashtable[bucket].first == SENTINEL)
 	{
-		return 0;
+		return SENTINEL;
 	}
 
-	scopestack_t * cur = hashtable[bucket].first;
+	nament_t * cur = hashtable[bucket].first;
 
 	while (strcmp(name, cur->name))
 	{
@@ -243,10 +231,10 @@ meta_t lookup_entry(char * name, int bucket)
 			break;		
 	}
 
-	return cur->head->metadata;
+	return cur;
 }
 
-void push_scope(scopestack_t * entry, meta_t data)
+void push_layer(nament_t * entry, meta_t data)
 {
 	layer_t *newhead = malloc(sizeof(layer_t));
 
@@ -257,7 +245,7 @@ void push_scope(scopestack_t * entry, meta_t data)
 	entry->head = newhead;
 }
 
-meta_t pop_scope(scopestack_t *entry)
+meta_t pop_layer(nament_t *entry)
 {
 	layer_t *oldhead = entry->head;
 
@@ -270,139 +258,98 @@ meta_t pop_scope(scopestack_t *entry)
 	return data;
 }
 
-
-void addobject(char * content) 
+void append_chain(nament_t * newentry, int bucket)
 {
-	object newobject;
-
-	char type;
-
-	long longval;
-
-	longval = strtol(content, &content, 0);
-
-	if (content[0] == '\0')
+	// Check if this bucket has anything in it
+	if (hashtable[bucket].first == SENTINEL)
 	{
-		getint(newobject) = longval;
-		type = TYPE_INT;
+		hashtable[bucket].first = newentry;
 	}
-	else if (strchr(content, '"'))
+	else
 	{
-		char * newval = malloc(sizeof(content));
-
-		memcpy(newval, content+1, strlen(content)-2);
-
-		getstr(newobject) = newval;
-
-		type = TYPE_STRING;
+		(hashtable[bucket].last)->next = newentry;
 	}
 
-	newobject.metadata = 
-			makemetadata(
-				newmem, 
-				type,
-				1,
-				FLAG_SET);
+	hashtable[bucket].last = newentry;
+}
 
-	memory[newmem] = newobject;
+meta_t addentry(char * string, meta_t type)
+{
+	int bucket = lookup_bucket(string);
+	nament_t * entry = lookup_entry(string, bucket);
+
+	if (entry == SENTINEL) // Not found...
+	{
+		// Allocate new stack for the new name
+		nament_t *newentry = malloc(sizeof(nament_t));
+		// Allocate new space for this particular instance of the name
+		layer_t *newlayer = malloc(sizeof(layer_t));
+
+		newlayer->metadata =
+			makemetadata(newmem, type, 0, FLAG_SET);
+		newlayer->next = SENTINEL;
+		newentry->head = newlayer;
+
+		newentry->name = string;
+		
+		newentry->next = SENTINEL;
+
+		append_chain(newentry, bucket);
+
+		newbucket++;
+		return newlayer->metadata;
+	}
+
+	return 0;
 }
 
 /* Takes the name, pointed-to address, and type of a variable entry
 	and returns either the address of the found entry or the newly-added one.
 	Also adds the object in 'content' if the entry doesn't already exist.
 */
-meta_t scanoradd(char * string,		// Var name
+meta_t addwithval(char * string,	// Var name
 		   meta_t type,				// Type of variable (POINT)
 		   char * content)			// Object content
 {
-	int bucket = lookup_bucket(string);
-
-	meta_t entry = lookup_entry(string, bucket);
-
-	if (entry == 0) // Not found...
-	{
-		// Allocate new stack for the new name
-		scopestack_t *newentry = malloc(sizeof(scopestack_t));
-		// Allocate new space for this particular instance of the name
-		layer_t *newscope = malloc(sizeof(layer_t));
-
-		newentry->name = string;
-
-		newentry->head = newscope;
-		newentry->head->metadata = 
-			makemetadata(newmem, type, 1, FLAG_SET);
-		newentry->head->next = SENTINEL;
-		
-		newentry->next = SENTINEL;
-
-		// Check if this bucket has anything in it
-		if (hashtable[bucket].first == SENTINEL)
-		{
-			hashtable[bucket].first = newentry;
-		}
-		else
-		{
-			(hashtable[bucket].last)->next = newentry;
-		}
-
-		hashtable[bucket].last = newentry;
-
-		addobject(content);
-
-		newmem++; newbucket++;
-
-		return newentry->head->metadata;
-	}
-
-	return entry;
+	addobject(content);
+	return addentry(string, type);
 }
 
-
+findwherefun(gett(cur->metadata) == TYPE_STRING, findstr);
 
 int main(int argc, char **argv)
 {
 	memset(hashtable, 0, BUCKETS * sizeof(bucket_t));
-
-
-	//char *varname	= malloc(50);
-	//char *val	= malloc(50);
 	
-	unsigned int val_addr  = 0;
-
 	meta_t hash_entry;
+	nament_t *found_entry;
+	
+	hash_entry = addentry("a", TYPE_INT);
+	found_entry = getentry("a");
+	printf("Entering 'a' gives %d with type %d.\n" 
+		   "Looking up 'a' gives %s with type %d.\n",
+		hash_entry, TYPE_INT,
+		found_entry->name, gett(found_entry->head->metadata));
+	
 
-	object foundobj;
+	layer_t *found_layer = findstr(found_entry);
 
-	while (val_addr++ < 1000)
+	if (found_layer != SENTINEL)
 	{
-		hash_entry = scanoradd("a", TYPE_INT, "123");
-		foundobj = memory[geta(hash_entry)];
-		
-		hash_entry = scanoradd("b", TYPE_STRING, "\"123\"");
-		foundobj = memory[geta(hash_entry)];
+		printf("Found %d, type %d\n", 
+			found_layer->metadata,
+			gett(found_layer->metadata));
 	}
+	else
+		printf("Not found.\n");
 
-	/*printf("Enter a word to add it\n");
-	while (1)
-	{
-		printf("%d>> ", newmem);
-		scanf("%s %s", varname, val);
-		putchar('\n');
 
-		hash_entry = scanoradd(varname,
-				  	 TYPE_POINT,
-				  	 val);
-
-		foundobj = memory[geta(hash_entry)];
-
-		printf("(%s -> %d) := ", 
-			varname, 
-			geta(hash_entry));
-
-		printval(foundobj);
-		putchar('\n');
-		putchar('\n');
-	}*/
+	hash_entry = addentry("b", TYPE_STRING);
+	found_entry = getentry("b");
+	printf("Entering 'b' gives %d with type %d.\n" 
+		   "Looking up 'b' gives %s with type %d.\n",
+		hash_entry, TYPE_STRING,
+		found_entry->name, gett(found_entry->head->metadata));
 
 	return 0;
 }
