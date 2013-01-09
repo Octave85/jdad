@@ -1,15 +1,12 @@
 #include "types.h"
-
-struct llm_t_st {	// General linked list member
-	void *data;
-	struct llm_t_st *next;
-};
-typedef struct llm_t_st llm_t;
-
+/*
 struct scalar_t_st {	// Scalar: string, double, or truthval
 	union {
 		char *string;
-		double doble;
+		struct {
+			double 	doble;
+			int		exp;
+		} number;
 		truthval_t truthval;
 	};
 	char *stringval;
@@ -22,16 +19,18 @@ struct object_t_st { 	// Key-value dictionary
 	llm_t *first;
 	llm_t *last;
 	hashtable_t *keys;
+	type_t type;
 };
 typedef struct object_t_st object_t;
 
 struct array_t_st {		// Ordered, numerically-indexed array
-	unsigned int length;
-	unsigned int maxlength;
-	llm_t *first;
-	llm_t *last;
+	unsigned int length;	// Current length
+	unsigned int maxlength; // Max possible length
+	llm_t **c;			// Contents: dynamic array of pointers to llm_t's
+	type_t type;
 };
 typedef struct array_t_st array_t;
+*/
 
 llm_t * new_llm(void *value, llm_t *next)
 {
@@ -46,122 +45,134 @@ llm_t * new_llm(void *value, llm_t *next)
 	return newllm;
 }
 
-array_t * new_arr(unsigned int maxlength)
+/*thing_t * new_thing(void *value, type_t type)
 {
-	array_t *newarr = malloc(sizeof(array_t));
-	newarr->length = 0;
-	newarr->maxlength = maxlength;
-	newarr->first = newarr->last = SENTINEL;
+	thing_t *newthing = malloc(sizeof(thing_t));
+
+	switch (type)
+	{
+		case Scalar:
+			newthing->scal = value;
+			break;
+		case Object:
+			newthing->obj  = value;
+			break;
+		case Array:
+			newthing->arr  = value;
+			break;
+	}
+
+	newthing->type = type;
+
+	return newthing;
+}*/
+
+thing_t * new_arr(unsigned int maxlength)
+{
+	thing_t *newarr = malloc(sizeof(thing_t));
+	
+	newarr->type      = Array;
+	newarr->arr.length    = 0;
+	newarr->arr.maxlength = maxlength;
+	newarr->arr.c         = calloc(maxlength, sizeof(thing_t));
 
 	return newarr;
 }
 
-int addelem(array_t *arr, int ind, void *value)
+int addelem(thing_t *arr, int ind, thing_t *value)
 {
-	// anymore than one past the length is a bounds error
-	//if (ind > (arr->length + (1 && arr->length))) 
-	//	return -1;
-
 	if (ind < 0)
-		ind = arr->length;
+		ind = arr->arr.length;
 
-	if (ind == 0)
+	if (++(arr->arr.length) > arr->arr.maxlength)
 	{
-		arr->first = new_llm(value, SENTINEL);
-		arr->last  = arr->first;
+		(arr->arr.length)--;
+		return -1;
 	}
 
-	llm_t *cur = arr->first;
+	arr->arr.c[ind] = value;
 
-	int i = 0;
-
-	while (++i < ind)	// Stops one before ind to insert in its place
-	{
-		cur = cur->next;
-	}
-
-	cur->next = new_llm(value, cur->next);
-
-	arr->length++;
 
 	return ind;
 }
 
-void * getarrval(array_t *arr, unsigned int ind)
+thing_t * getarrval(thing_t *arr, unsigned int ind)
 {
-	llm_t *cur = arr->first;
-	int i = 0;
+	if (ind < arr->arr.length)
+		return arr->arr.c[ind];
 
-	while(cur != SENTINEL && i++ < ind)	// Stops at ind to grab it
-		cur = cur->next;
-
-
-	return cur->data;
+	return NULL;
 }
 
 
-object_t * new_obj(unsigned int length)
+thing_t * new_obj(unsigned int length)
 {
-	object_t *newobj = malloc(sizeof(object_t));
+	thing_t *newobj = malloc(sizeof(thing_t));
 
 	if (newobj)
 	{
-		newobj->length = 0;	// Current number of k/v pairs
-		newobj->first = newobj->last = SENTINEL; // First and last key names
-		newobj->keys = new_hashtable(length);	// "full" number
+		newobj->type   = Object;
+		newobj->obj.length = 0;	// Current number of k/v pairs
+		newobj->obj.first  = newobj->obj.last = SENTINEL; // First and last key names
+		newobj->obj.keys   = new_hashtable(length);	// "full" number
 	} 
 
 	return newobj;
 }
 
-nament_t * addkv(object_t *object, char *key, void *value)
+nament_t * addkv(thing_t *object, char *key, void *value)
 {
 	// Add key to object's key table
-	nament_t *newk = addentry(object->keys, key);
+	nament_t *newk = addentry(object->obj.keys, key);
 	// Point key to value
 	newk->first->val = value;
 	// Append key to keyname list
 	llm_t *newname = new_llm(key, SENTINEL);
 	
-	if (object->last)
+	if (object->obj.last)
 	{
-		object->last->next = newname;
+		object->obj.last->next = newname;
 	}
 	else
 	{
-		object->first = newname;
-		object->last  = newname;
+		object->obj.first = newname;
+		object->obj.last  = newname;
 	}
 	
-	object->length++;
+	object->obj.length++;
 
 	return newk;
 }
 
-void * getobjval(object_t *obj, char *key)
+thing_t * getobjval(thing_t *obj, char *key)
 {
-	nament_t *entry = getentry(obj->keys, key);
+	nament_t *entry = getentry(obj->obj.keys, key);
 
 	if (entry)
 	{
-		return entry->first->val;
+		return (thing_t *)entry->first->val;
 	}
 
 	return NULL;
 }
 
-void print_scalar(scalar_t *sc)
+void print_scalar(thing_t *sc)
 {
-	switch (sc->type)
+	switch (sc->scal.type)
 	{
 		case Doble:
-			printf("%.3f", sc->doble);
+			printf("%.3f", sc->scal.number.doble);
+			if (sc->scal.number.exp > 0)
+			{
+				putchar('e');
+				printf("%d", sc->scal.number.exp);
+			}
 			break;
 		case String:
-			printf ("\"%s\"", sc->string);
+			printf ("\"%s\"", sc->scal.string);
 			break;
 		case Truthval:
-			switch (sc->truthval)
+			switch (sc->scal.truthval)
 			{
 				case False:
 					printf("False");
@@ -177,21 +188,21 @@ void print_scalar(scalar_t *sc)
 	}
 }
 
-void print_obj(object_t *object)
+void print_obj(thing_t *obj)
 {
 	int i;
 
 	llm_t *key;
-	scalar_t *value;
+	thing_t *value;
 
 	printf("{\n");
 
-	key = object->first;
+	key = obj->obj.first;
 	while (key != SENTINEL)
 	{
 		printf("%s: ", key->data);
-		value = getobjval(object, key->data);
-		print_scalar(value);
+		value = getobjval(obj, key->data);
+		print_thing(value);
 		putchar('\n');
 		key = key->next;
 	}
@@ -199,39 +210,60 @@ void print_obj(object_t *object)
 	printf("}\n");
 }
 
-void print_arr(array_t *array)
+void print_arr(thing_t *arr)
 {
-	llm_t *cur = array->first;
-
-	printf("[\n");
-	while (cur != SENTINEL)
+	printf("[");
+	int i;
+	for (i = 0; i < arr->arr.length - 1; i++)
 	{
-		print_scalar(cur->data);
+		print_thing(arr->arr.c[i]);
 		printf(", ");
 	}
-	printf("]\n");
+
+	print_thing(arr->arr.c[i]);
+
+	printf("]");
+}
+
+void print_thing(thing_t *thing)
+{
+	switch (thing->type)
+	{
+		case Scalar:
+			print_scalar(thing);
+			break;
+		case Object:
+			print_obj(thing);
+			break;
+		case Array:
+			print_arr(thing);
+			break;
+	}
 }
 
 void TEST_obj(void)
 {
 	// Test: add some values to an object
-	object_t *test = new_obj(3);
+	thing_t *test = new_obj(3);
 
 	nament_t *key;
-	scalar_t *value = malloc(sizeof(scalar_t));
-	scalar_t *value2 = malloc(sizeof(scalar_t));
+	thing_t *value = malloc(sizeof(thing_t));
+	thing_t *value2 = malloc(sizeof(thing_t));
 
 	// Populate the value's fields
-	value->type = Doble;
-	value->stringval = "1234";
-	value->doble = 1234.f;
+	value->type = Scalar;
+	value->scal.stringval = "1234";
+	value->scal.number.doble = 1234.f;
+	value->scal.number.exp = 0;
+	value->scal.type = Doble;
 
 	// Add the key and value
 	key = addkv(test, "key1", value);
 
-	value2->type = String;
-	value2->stringval = "hey guise";
-	value2->string = "hey guise";
+	value2->type = Scalar;
+	value2->scal.stringval = "hey guise";
+	value2->scal.string = "hey guise";
+	value2->scal.type = String;
 
 	key = addkv(test, "key2", value2);
 
@@ -241,27 +273,43 @@ void TEST_obj(void)
 
 void TEST_arr(void)
 {
-	array_t *arr = new_arr(4);
+	thing_t *arr = new_arr(4);
 
-	scalar_t *val1 = malloc(sizeof(scalar_t));
-	scalar_t *val2 = malloc(sizeof(scalar_t));
+	thing_t *val1 = malloc(sizeof(thing_t));
+	thing_t *val2 = malloc(sizeof(thing_t));
 
-	val1->type = String;
-	val1->stringval = "hehe";
-	val1->string = "hehe";
+	val1->type = Scalar;
+	val1->scal.stringval = "hehe";
+	val1->scal.string = "hehe";
+	val1->scal.type = String;
 
-	val2->type = String;
-	val2->stringval = "nonono";
-	val2->string = "nonono";
+	val2->type = Scalar;
+	val2->scal.stringval = "nonono";
+	val2->scal.string = "nonono";
+	val2->scal.type = String;
 
-	addelem(arr, -1, val1);
-	addelem(arr, -1, val2);
-	print_scalar(getarrval(arr, 0));
-	print_scalar(getarrval(arr, 1));
-	//print_scalar(getarrval(arr, addelem(arr, -1, val1)));
-	//print_scalar(getarrval(arr, addelem(arr, -1, val2)));
+	addelem(arr, ARR_A, val1);
+	addelem(arr, ARR_A, val2);
+	print_thing(getarrval(arr, 0));
+	print_thing(getarrval(arr, 1));
 
-	//print_arr(arr);
+	// Nested array
+
+	thing_t *val3 = malloc(sizeof(thing_t));
+	thing_t *val4 = malloc(sizeof(thing_t));
+
+	val3 = new_arr(1);
+	val3->type = Array;
+	val4->type = Scalar;
+	val4->scal.type = Doble;
+	val4->scal.number.doble = 40.f;
+	val4->scal.number.exp = 0;
+	val4->scal.stringval = "40";
+
+	addelem(val3, ARR_A, val4);
+	addelem(arr, ARR_A, val3);
+
+	print_thing(arr);
 }
 
 int main(int argc, char **argv)

@@ -2,6 +2,7 @@
 #define SYMTAB_H
 
 #include "global.h"
+#include "types.h"
 #include <string.h>
 
 #define BUCKETS 1024
@@ -56,14 +57,6 @@ struct nament_t_st
 
 typedef struct nament_t_st nament_t;
 
-/*// Independent entry - name and metadata only
-typedef struct 
-{
-	char *name;
-	meta_t metadata;
-} entry_t;
-*/
-
 // Linked-list container
 typedef struct 
 {
@@ -72,12 +65,13 @@ typedef struct
 	nament_t *last;
 } bucket_t;
 
-typedef struct 
+struct hashtable_t_st
 {
 	unsigned int length;
 	bucket_t *b;
-} hashtable_t;
+};
 
+typedef struct hashtable_t_st hashtable_t;
 
 #define META_ADDR 	20
 #define META_TYPE	12

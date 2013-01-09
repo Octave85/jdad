@@ -1,3 +1,4 @@
+#include "types.h"
 #include "symtab.h"
 
 /*** Stuff for Paul Hsieh's SuperFastHash function

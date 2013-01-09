@@ -5,9 +5,51 @@
 #include "symtab.h"
 #include "global.h"
 
-typedef enum { String, Doble, Truthval, Object, Array } type_t;
+#define ARR_A -1
 
-typedef enum { False True Null } truthval_t;
+typedef enum { String, Doble, Truthval, Object, Array, Scalar, Thing } type_t;
+
+struct llm_t_st {	// General linked list member/data container.
+	void *data;
+	struct llm_t_st *next;
+};
+typedef struct llm_t_st llm_t;
+
+struct thing_t_st {
+	union {
+		
+		struct {	/* Scalar */
+			union {
+				char *string;
+				struct {
+					double 	doble;
+					int		exp;
+				} number;
+				truthval_t truthval;
+			};
+			char *stringval;
+			type_t type;
+		} scal;
+		
+		struct {	/* Object */
+			unsigned int length;
+			llm_t *first;
+			llm_t *last;
+			hashtable_t *keys;
+		} obj;
+		
+		struct {	/* Array */
+			unsigned int length;	// Current length
+			unsigned int maxlength; // Max possible length
+			llm_t **c;			// Contents: dynamic array of pointers to llm_t's
+		} arr;
+	};
+
+	type_t type;	/* Type */
+};
+
+typedef struct thing_t_st thing_t;
+
 
 /* TYPES_H */
 #endif
