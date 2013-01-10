@@ -67,6 +67,16 @@ llm_t * new_llm(void *value, llm_t *next)
 	return newthing;
 }*/
 
+thing_t * new_scal(char *stringval, type_t type)
+{
+	thing_t *newscal = malloc(sizeof(thing_t));
+	newscal->type = Scalar;
+	newscal->scal.type = type;
+	newscal->scal.stringval = stringval;
+
+	return newscal;
+}
+
 thing_t * new_arr(unsigned int maxlength)
 {
 	thing_t *newarr = malloc(sizeof(thing_t));
@@ -275,18 +285,11 @@ void TEST_arr(void)
 {
 	thing_t *arr = new_arr(4);
 
-	thing_t *val1 = malloc(sizeof(thing_t));
-	thing_t *val2 = malloc(sizeof(thing_t));
+	thing_t *val1 = new_scal("hehe", String);
+	thing_t *val2 = new_scal("nonono", String);
 
-	val1->type = Scalar;
-	val1->scal.stringval = "hehe";
 	val1->scal.string = "hehe";
-	val1->scal.type = String;
-
-	val2->type = Scalar;
-	val2->scal.stringval = "nonono";
 	val2->scal.string = "nonono";
-	val2->scal.type = String;
 
 	addelem(arr, ARR_A, val1);
 	addelem(arr, ARR_A, val2);
@@ -295,16 +298,11 @@ void TEST_arr(void)
 
 	// Nested array
 
-	thing_t *val3 = malloc(sizeof(thing_t));
-	thing_t *val4 = malloc(sizeof(thing_t));
+	thing_t *val3 = new_arr(1);
+	thing_t *val4 = new_scal("40", Doble);
 
-	val3 = new_arr(1);
-	val3->type = Array;
-	val4->type = Scalar;
-	val4->scal.type = Doble;
 	val4->scal.number.doble = 40.f;
 	val4->scal.number.exp = 0;
-	val4->scal.stringval = "40";
 
 	addelem(val3, ARR_A, val4);
 	addelem(arr, ARR_A, val3);
@@ -316,6 +314,8 @@ int main(int argc, char **argv)
 {
 	TEST_obj();
 	TEST_arr();
+	printf("\n%d", sizeof(thing_t));
+	putchar('\n');
 
 	return 0;
 }

@@ -7,6 +7,13 @@
 
 #define ARR_A -1
 
+#define ATOM_UNION char *string; \
+	struct { 	\
+		double 	doble;	\
+		int		exp;	\
+	} number;	\
+	truthval_t truthval;
+
 typedef enum { String, Doble, Truthval, Object, Array, Scalar, Thing } type_t;
 
 struct llm_t_st {	// General linked list member/data container.
@@ -15,17 +22,17 @@ struct llm_t_st {	// General linked list member/data container.
 };
 typedef struct llm_t_st llm_t;
 
+union atom_t_st {
+	ATOM_UNION;
+};
+typedef union atom_t_st atom_t;
+
 struct thing_t_st {
 	union {
 		
 		struct {	/* Scalar */
 			union {
-				char *string;
-				struct {
-					double 	doble;
-					int		exp;
-				} number;
-				truthval_t truthval;
+				ATOM_UNION;
 			};
 			char *stringval;
 			type_t type;
