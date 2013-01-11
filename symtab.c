@@ -67,9 +67,9 @@ bucket_t hashtable[BUCKETS];
 
 hashtable_t * new_hashtable(unsigned int buckets)
 {
-	hashtable_t *newtable = (hashtable_t *)malloc(sizeof(hashtable_t));
+	hashtable_t *newtable = (hashtable_t *)c_malloc(sizeof(hashtable_t));
 	newtable->length = buckets;
-	newtable->b = (bucket_t *)calloc(buckets, sizeof(bucket_t));
+	newtable->b = (bucket_t *)c_calloc(buckets, sizeof(bucket_t));
 
 	return newtable;
 }
@@ -103,7 +103,7 @@ nament_t * lookup_entry(hashtable_t *ht,
 
 truthval_t push_layer(nament_t * entry, meta_t data)
 {
-	layer_t *newhead = malloc(sizeof(layer_t));
+	layer_t *newhead = c_malloc(sizeof(layer_t));
 
 	newhead->metadata = data;
 
@@ -153,9 +153,9 @@ nament_t * addentry(hashtable_t *ht,
 	if (entry == SENTINEL) // Not found...
 	{
 		// Allocate new stack for the new name
-		nament_t *newentry = malloc(sizeof(nament_t));
+		nament_t *newentry = c_malloc(sizeof(nament_t));
 		// Allocate new space for this particular instance of the name
-		layer_t *newlayer = malloc(sizeof(layer_t));
+		layer_t *newlayer = c_malloc(sizeof(layer_t));
 
 		newlayer->metadata =
 			makemetadata(0, 0, 0, FLAG_SET);

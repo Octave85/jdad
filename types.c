@@ -1,40 +1,11 @@
 #include "types.h"
-/*
-struct scalar_t_st {	// Scalar: string, double, or truthval
-	union {
-		char *string;
-		struct {
-			double 	doble;
-			int		exp;
-		} number;
-		truthval_t truthval;
-	};
-	char *stringval;
-	type_t type;
-};
-typedef struct scalar_t_st scalar_t;
 
-struct object_t_st { 	// Key-value dictionary
-	unsigned int length;
-	llm_t *first;
-	llm_t *last;
-	hashtable_t *keys;
-	type_t type;
-};
-typedef struct object_t_st object_t;
-
-struct array_t_st {		// Ordered, numerically-indexed array
-	unsigned int length;	// Current length
-	unsigned int maxlength; // Max possible length
-	llm_t **c;			// Contents: dynamic array of pointers to llm_t's
-	type_t type;
-};
-typedef struct array_t_st array_t;
-*/
+int malloc_c = 0;
+size_t mem_c = 0;
 
 llm_t * new_llm(void *value, llm_t *next)
 {
-	llm_t *newllm = malloc(sizeof(llm_t));
+	llm_t *newllm = c_malloc(sizeof(llm_t));
 
 	if (newllm)
 	{
@@ -45,31 +16,10 @@ llm_t * new_llm(void *value, llm_t *next)
 	return newllm;
 }
 
-/*thing_t * new_thing(void *value, type_t type)
-{
-	thing_t *newthing = malloc(sizeof(thing_t));
-
-	switch (type)
-	{
-		case Scalar:
-			newthing->scal = value;
-			break;
-		case Object:
-			newthing->obj  = value;
-			break;
-		case Array:
-			newthing->arr  = value;
-			break;
-	}
-
-	newthing->type = type;
-
-	return newthing;
-}*/
 
 thing_t * new_scal(char *stringval, type_t type)
 {
-	thing_t *newscal = malloc(sizeof(thing_t));
+	thing_t *newscal = c_malloc(sizeof(thing_t));
 	newscal->type = Scalar;
 	newscal->scal.type = type;
 	newscal->scal.stringval = stringval;
@@ -79,12 +29,12 @@ thing_t * new_scal(char *stringval, type_t type)
 
 thing_t * new_arr(unsigned int maxlength)
 {
-	thing_t *newarr = malloc(sizeof(thing_t));
+	thing_t *newarr = c_malloc(sizeof(thing_t));
 	
 	newarr->type      = Array;
 	newarr->arr.length    = 0;
 	newarr->arr.maxlength = maxlength;
-	newarr->arr.c         = calloc(maxlength, sizeof(thing_t));
+	newarr->arr.c         = c_calloc(maxlength, sizeof(thing_t));
 
 	return newarr;
 }
@@ -117,37 +67,29 @@ thing_t * getarrval(thing_t *arr, unsigned int ind)
 
 thing_t * new_obj(unsigned int length)
 {
-	thing_t *newobj = malloc(sizeof(thing_t));
+	thing_t *newobj = c_malloc(sizeof(thing_t));
 
 	if (newobj)
 	{
-		newobj->type   = Object;
-		newobj->obj.length = 0;	// Current number of k/v pairs
-		newobj->obj.first  = newobj->obj.last = SENTINEL; // First and last key names
-		newobj->obj.keys   = new_hashtable(length);	// "full" number
+		newobj->type  		= Object;
+		newobj->obj.length	= 0;	// Current number of k/v pairs
+		newobj->obj.keys 	= c_calloc(length, sizeof(thing_t));
+		newobj->obj.vals 	= c_calloc(length, sizeof(thing_t));
+		newobj->obj.ht   	= new_hashtable(length);	// "full" number
 	} 
 
 	return newobj;
 }
 
-nament_t * addkv(thing_t *object, char *key, void *value)
+nament_t * addkv(thing_t *object, char *key, thing_t *value)
 {
 	// Add key to object's key table
-	nament_t *newk = addentry(object->obj.keys, key);
+	nament_t *newk = addentry(object->obj.ht, key);
 	// Point key to value
 	newk->first->val = value;
 	// Append key to keyname list
-	llm_t *newname = new_llm(key, SENTINEL);
-	
-	if (object->obj.last)
-	{
-		object->obj.last->next = newname;
-	}
-	else
-	{
-		object->obj.first = newname;
-		object->obj.last  = newname;
-	}
+	object->obj.keys[object->obj.length] = key;
+	object->obj.vals[object->obj.length] = value;
 	
 	object->obj.length++;
 
@@ -156,7 +98,7 @@ nament_t * addkv(thing_t *object, char *key, void *value)
 
 thing_t * getobjval(thing_t *obj, char *key)
 {
-	nament_t *entry = getentry(obj->obj.keys, key);
+	nament_t *entry = getentry(obj->obj.ht, key);
 
 	if (entry)
 	{
@@ -200,29 +142,34 @@ void print_scalar(thing_t *sc)
 
 void print_obj(thing_t *obj)
 {
-	int i;
-
-	llm_t *key;
+	char *key;
 	thing_t *value;
 
-	printf("{\n");
+	printf("{ ");
 
-	key = obj->obj.first;
-	while (key != SENTINEL)
+	/* In progress: turn keys[] into an array instead of an LL
+	** and add values to valuesp[] array. Change array values to 
+	** **thing_t instead of llm_t */
+	int i = 0;
+	for (; i < obj->obj.length - 1; i++)
 	{
-		printf("%s: ", key->data);
-		value = getobjval(obj, key->data);
+		key = obj->obj.keys[i];
+		value = obj->obj.vals[i];
+
+		printf("%s: ", key);
 		print_thing(value);
-		putchar('\n');
-		key = key->next;
+		printf(", ");
 	}
 
-	printf("}\n");
+	printf("%s: ", obj->obj.keys[i]);
+	print_thing(obj->obj.vals[i]);
+
+	printf(" }\n");
 }
 
 void print_arr(thing_t *arr)
 {
-	printf("[");
+	printf("[ ");
 	int i;
 	for (i = 0; i < arr->arr.length - 1; i++)
 	{
@@ -232,7 +179,7 @@ void print_arr(thing_t *arr)
 
 	print_thing(arr->arr.c[i]);
 
-	printf("]");
+	printf(" ]");
 }
 
 void print_thing(thing_t *thing)
@@ -257,23 +204,17 @@ void TEST_obj(void)
 	thing_t *test = new_obj(3);
 
 	nament_t *key;
-	thing_t *value = malloc(sizeof(thing_t));
-	thing_t *value2 = malloc(sizeof(thing_t));
+	thing_t *value  = new_scal("1234", Doble);
+	thing_t *value2 = new_scal("hey guise", String);
 
 	// Populate the value's fields
-	value->type = Scalar;
-	value->scal.stringval = "1234";
 	value->scal.number.doble = 1234.f;
 	value->scal.number.exp = 0;
-	value->scal.type = Doble;
 
 	// Add the key and value
 	key = addkv(test, "key1", value);
 
-	value2->type = Scalar;
-	value2->scal.stringval = "hey guise";
 	value2->scal.string = "hey guise";
-	value2->scal.type = String;
 
 	key = addkv(test, "key2", value2);
 
@@ -293,8 +234,6 @@ void TEST_arr(void)
 
 	addelem(arr, ARR_A, val1);
 	addelem(arr, ARR_A, val2);
-	print_thing(getarrval(arr, 0));
-	print_thing(getarrval(arr, 1));
 
 	// Nested array
 
@@ -316,6 +255,10 @@ int main(int argc, char **argv)
 	TEST_arr();
 	printf("\n%d", sizeof(thing_t));
 	putchar('\n');
+
+	printf("MEM STATS:\n"
+		   "Malloc/Callocs: %d\n"
+		   "Bytes allocated: %d\n", malloc_c, mem_c);
 
 	return 0;
 }

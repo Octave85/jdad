@@ -40,15 +40,15 @@ struct thing_t_st {
 		
 		struct {	/* Object */
 			unsigned int length;
-			llm_t *first;
-			llm_t *last;
-			hashtable_t *keys;
+			char 			  **keys;
+			struct thing_t_st **vals;
+			hashtable_t  	  *ht;
 		} obj;
 		
 		struct {	/* Array */
 			unsigned int length;	// Current length
 			unsigned int maxlength; // Max possible length
-			llm_t **c;			// Contents: dynamic array of pointers to llm_t's
+			struct thing_t_st **c;	// Contents: dynamic array of pointers to llm_t's
 		} arr;
 	};
 
