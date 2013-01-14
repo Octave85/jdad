@@ -1,8 +1,5 @@
-#include "global.h"
-#include "types.h"
-#include "symtab.h"
-#include <ctype.h>
-#include <stdlib.h>
+#include "scan.h"
+
 
 #define case_digit case '0': \
 case '1': \
@@ -15,36 +12,16 @@ case '7': \
 case '8': \
 case '9' 
 
-#define unex() error(c, state, str, file); state = Error; tok = tEnd;
-#define accept(tt) prevc(c, file, str); state = Accept; tok = tt;
+#define nextc() _nextc(sc->file, sc->str)
+#define prevc() _prevc(c, sc->file, sc->str)
+#define sspaces() _sspaces(c, sc->file, sc->str)
+#define error() _error(c, sc)
 
-typedef enum {
-	tLCurl,   // 0
-	tRCurl,   // 1
-	tColon,   // 2
-	tComma,   // 3
-	tLBrace,  // 4
-	tRBrace,  // 5
-	tDQuote,  // 6
-	tString,  // 7
-	tDoble,   // 8
-	tSpecial, // 9
-	tEscape,  // 10
-	tEnd,     // 11
-} token_t;
+#define unex() error(); *state = Error; tok = tErr;
+#define accept(tt) *state = Accept; tok = tt;
+#define accept_pb(tt) prevc(); accept(tt);
 
-typedef enum {
-	Start, Accept, Error,
-	InObjK, InObjV,
-	InArr, 
-	StartNum, InNum, InFrac, InExp, InStr,
-	InEscape, InHex, InSpecial,
-} state_t;
 
-typedef struct {
-	token_t tok;
-	char *stringval;
-} scan_t;
 
 FILE * open_json(char *filename)
 {
@@ -56,12 +33,12 @@ FILE * open_json(char *filename)
 	}
 	else
 	{
-		printf("Error opening file.\n");
+		printf("Error openixng file.\n");
 		exit(1);
 	}
 }
 
-int nextc(FILE *file, char *str)
+int _nextc(FILE *file, char *str)
 {
 	int l, c;
 	c = getc(file);
@@ -78,7 +55,7 @@ int nextc(FILE *file, char *str)
 	return c;
 }
 
-int prevc(int c, FILE *file, char *str)
+int _prevc(int c, FILE *file, char *str)
 {
 	if (str != NULL)
 	{	
@@ -90,100 +67,107 @@ int prevc(int c, FILE *file, char *str)
 	return ungetc(c, file);
 }
 
-int error(int c, state_t st, char *str, FILE *file)
+int _error(int c, scanner_t *sc)
 {
 	printf("Unexpected %c in stream (in state %d)"
-		" (Had partial token %s)\n", c, st, str);
+		" (Had partial token %s)\n", c, sc->state, sc->str);
+	sc->errors++;
+	
 	return 1;
 }
 
-void sspaces(int c, FILE *file, char *str)
+void _sspaces(int c, FILE *file, char *str)
 {
 	// Skip spaces
 	while (isspace(c))
 	{
-		c = nextc(file, NULL);
+		c = getc(file);
 	}
 	// Put back first nonspace
-	prevc(c, file, str);
+	_prevc(c, file, str);
 }
 
-token_t scan_json(FILE *file, char *str)
+token_t scan_json(scanner_t *sc)
 {
 	token_t tok;
-	state_t state = Start;
+	state_t *state = &(sc->state);
+	*state = Start;
+
 	int c, i = 0;
-	memset(str, 0, strlen(str));
+	memset(sc->str, 0, strlen(sc->str));
 
 	for (;;i++)
 	{
 		
-		switch (state)
+		switch (*state)
 		{
 			case Start:
-				c = nextc(file, str);
+				c = nextc();
 
 				switch (c)
 				{
 					case '{':
-						state = Accept;
-						tok = tLCurl;
+						accept(tLCurl);
 						break;
 
 					case '}':
-						state = Accept;
-						tok = tRCurl;
+						accept(tRCurl);
 						break;
 
 					case ',':
-						state = Accept;
-						tok = tComma;
+						accept(tComma);
 						break;
 
 					case '[':
-						state = Accept;
-						tok = tLBrace;
+						accept(tLBrace);
 						break;
 
 					case ']':
-						state = Accept;
-						tok = tRBrace;
+						accept(tRBrace);
 						break;
 
 					case '"':
-						state = InStr;
 						tok = tString;
+						*state = InStr;
 						break;
 
 					case ':':
-						state = Accept;
-						tok = tColon;
+						accept(tColon);
 						break;
 					
+					case 'T':
+					case 't':
+						*state = InT1;
+						tok = tTrue;
+						break;
+
+					case 'F':
+					case 'f':
+						*state = InF1;
+						tok = tFalse;
+						break;
+
+					case 'N':
+					case 'n':
+						*state = InN1;
+						tok = tNull;
+						break;
+
 					case '.':
 					case '-':
 					case_digit:
-						state = StartNum;
-						prevc(c, file, str);
+						*state = StartNum;
+						prevc();
 						break;
 
 					case EOF:
-						state = Accept;
-						tok = tEnd;
+						accept(tEnd);
+						break;
 
 					default:
-						if (isalpha(c))
+						if (isspace(c))
 						{
-							state = InSpecial;
-						}
-						else if (isspace(c))
-						{
-							sspaces(c, file, str);
-						}
-						else if (c == EOF)
-						{
-							state = Accept;
-							tok = tEnd;
+							sspaces();
 						}
 						else
 						{
@@ -197,18 +181,18 @@ token_t scan_json(FILE *file, char *str)
 				return tok;
 
 			case StartNum:
-				c = nextc(file, str);
+				c = nextc();
 
 				switch (c)
 				{
 					case '-':
 					case_digit:
-						state = InNum;
+						*state = InNum;
 						tok = tDoble;
 						break;
 
 					case '.':
-						state = InFrac;
+						*state = InFrac;
 						tok = tDoble;
 						break;
 
@@ -218,7 +202,7 @@ token_t scan_json(FILE *file, char *str)
 				break; // StartNum
 
 			case InNum:
-				c = nextc(file, str);
+				c = nextc();
 
 				switch (c)
 				{
@@ -226,23 +210,23 @@ token_t scan_json(FILE *file, char *str)
 						break;
 
 					case '.':
-						state = InFrac;
+						*state = InFrac;
 						tok = tDoble;
 						break;
 
 					case 'e':
 					case 'E':
-						state = InExp;
+						*state = InExp;
 						tok = tDoble;
 						break;
 
 					default:
-						accept(tDoble);
+						accept_pb(tDoble);
 				}
 				break; // InNum
 
 			case InFrac:
-				c = nextc(file, str);
+				c = nextc();
 				switch (c)
 				{
 					case_digit:	// Stay in this state
@@ -250,7 +234,7 @@ token_t scan_json(FILE *file, char *str)
 
 					case 'e':
 					case 'E':
-						state = InExp;
+						*state = InExp;
 						break;
 
 					case '.':
@@ -258,12 +242,12 @@ token_t scan_json(FILE *file, char *str)
 						break;
 
 					default:
-						accept(tDoble);
+						accept_pb(tDoble);
 				}
 				break; //InFrac
 
 			case InExp:
-				c = nextc(file, str);
+				c = nextc();
 				switch (c)
 				{
 					case '+':
@@ -276,21 +260,20 @@ token_t scan_json(FILE *file, char *str)
 						break;
 
 					default:
-						accept(tDoble);
+						accept_pb(tDoble);
 				}
 				break; // InExp
 
 			case InStr:
-				c = nextc(file, str);
+				c = nextc();
 				switch (c)
 				{
 					case '\\':
-						state = InEscape;
+						*state = InEscape;
 						break;
 
 					case '"':
-						state = Accept;
-						tok = tString;
+						accept(tString);
 						break;
 
 					case EOF:
@@ -299,7 +282,7 @@ token_t scan_json(FILE *file, char *str)
 				break; // InStr
 
 			case InEscape:
-				c = nextc(file, str);
+				c = nextc();
 				switch (c)
 				{
 					case '"':
@@ -311,7 +294,7 @@ token_t scan_json(FILE *file, char *str)
 					case 'r':
 					case 't':
 					case 'u':
-						state = InStr;
+						*state = InStr;
 						break;
 
 					default:
@@ -319,14 +302,125 @@ token_t scan_json(FILE *file, char *str)
 				}
 				break; // InEscape
 
-			case InSpecial:
-				c = nextc(file, str);
-				if ( ! isalpha(c))
+			case InT1:
+				c = nextc();
+				if (c == 'R' || c == 'r')
 				{
-					accept(tSpecial);
+					*state = InT2;
 				}
-				break; // InSpecial
+				else
+				{
+					unex();
+				}
+				break; // InT1
 
+			case InT2:
+				c = nextc();
+				if (c == 'U' || c == 'u')
+				{
+					*state = InT3;
+				}
+				else
+				{
+					unex();
+				}
+				break; // InT2
+
+			case InT3:	
+				c = nextc();
+				if (c == 'E' || c == 'e')
+				{
+					accept(tTrue);
+				}
+				else
+				{
+					unex();
+				}
+				break; // InT3
+
+			case InF1:
+				c = nextc();
+				if (c == 'A' || c == 'a')
+				{
+					*state = InF2;
+				}
+				else
+				{
+					unex();
+				}
+				break; // InF1
+
+			case InF2:
+				c = nextc();
+				if (c == 'L' || c == 'l')
+				{
+					*state = InF3;
+				}
+				else
+				{
+					unex();
+				}
+				break; // InF2
+
+			case InF3:	
+				c = nextc();
+				if (c == 'S' || c == 's')
+				{
+					*state = InF4;
+				}
+				else
+				{
+					unex();
+				}
+				break; // InF3
+
+			case InF4:
+				c = nextc();
+				if (c == 'E' || c == 'e')
+				{
+					accept(tFalse);
+				}
+				else
+				{
+					unex();
+				}
+				break; // InF4
+
+			case InN1:
+				c = nextc();
+				if (c == 'U' || c == 'u')
+				{
+					*state = InN2;
+				}
+				else
+				{
+					unex();
+				}
+				break; // InN1
+
+			case InN2:
+				c = nextc();
+				if (c == 'L' || c == 'l')
+				{
+					*state = InN3;
+				}
+				else
+				{
+					unex();
+				}
+				break; // InN2
+
+			case InN3:	
+				c = nextc();
+				if (c == 'L' || c == 'l')
+				{
+					accept(tNull);
+				}
+				else
+				{
+					unex();
+				}
+				break; // InN3;
 
 		
 		// End of state switch
@@ -338,15 +432,15 @@ token_t scan_json(FILE *file, char *str)
 
 int main(int argc, char **argv)
 {
-	FILE *json = open_json("test.json");
+	scanner_t *json = malloc(sizeof(scanner_t));
+	json->str = calloc(50, 1);
+	json->file = open_json("test.json");
 
 	token_t tok;
-	char *stringval = malloc(50);
-	memset(stringval, 0, 50);
 
-	while ((tok = scan_json(json, stringval)) != tEnd)
+	while ((tok = scan_json(json)) != tEnd)
 	{
-		printf("Toke: %s (%d)\n", stringval, tok);
+		if (tok != tErr) printf("Toke: %s (%d)\n", json->str, tok);
 	}
 	putchar('\n');
 

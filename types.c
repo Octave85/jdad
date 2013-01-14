@@ -156,12 +156,12 @@ void print_obj(thing_t *obj)
 		key = obj->obj.keys[i];
 		value = obj->obj.vals[i];
 
-		printf("%s: ", key);
+		printf("\"%s\": ", key);
 		print_thing(value);
 		printf(", ");
 	}
 
-	printf("%s: ", obj->obj.keys[i]);
+	printf("\"%s\": ", obj->obj.keys[i]);
 	print_thing(obj->obj.vals[i]);
 
 	printf(" }\n");
