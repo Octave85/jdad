@@ -160,6 +160,12 @@ token_t scan_json(scanner_t *sc)
 						prevc();
 						break;
 
+					case 'e':
+					case 'E':
+						*state = InExp;
+						sc->str[strlen(sc->str)-1] = '\0';
+						break;
+
 					case EOF:
 						accept(tEnd);
 						break;
@@ -214,12 +220,6 @@ token_t scan_json(scanner_t *sc)
 						tok = tDoble;
 						break;
 
-					case 'e':
-					case 'E':
-						*state = InExp;
-						tok = tDoble;
-						break;
-
 					default:
 						accept_pb(tDoble);
 				}
@@ -230,11 +230,6 @@ token_t scan_json(scanner_t *sc)
 				switch (c)
 				{
 					case_digit:	// Stay in this state
-						break;
-
-					case 'e':
-					case 'E':
-						*state = InExp;
 						break;
 
 					case '.':
@@ -260,7 +255,7 @@ token_t scan_json(scanner_t *sc)
 						break;
 
 					default:
-						accept_pb(tDoble);
+						accept_pb(tExp);
 				}
 				break; // InExp
 
@@ -430,7 +425,7 @@ token_t scan_json(scanner_t *sc)
 	}
 }
 
-int main(int argc, char **argv)
+/*int main(int argc, char **argv)
 {
 	scanner_t *json = malloc(sizeof(scanner_t));
 	json->str = calloc(50, 1);
@@ -446,4 +441,4 @@ int main(int argc, char **argv)
 
 	return 0;
 
-}
+}*/
