@@ -6,11 +6,13 @@
 #include "global.h"
 
 #define ARR_A -1
+#define HT_THRESH 257
 
 // Property-access macros for the three types
 #define oa(t, p) t->p
 #define aa(t, p) t->p
 #define sa(t, p) t->p
+#define la(l, f, t) *(l).*((t)data).f
 
 #define ATOM_UNION char *string; \
 	struct { 	\
@@ -26,6 +28,7 @@ struct llm_t_st {	// General linked list member/data container.
 	struct llm_t_st *next;
 };
 typedef struct llm_t_st llm_t;
+
 
 union atom_t_st {
 	ATOM_UNION;
@@ -43,17 +46,25 @@ struct thing_t_st {
 			type_t stype;
 		};
 		
+		/* Make objects and arrays use dynamic linked lists
+		** as opposed to once-allocated arrays so that they can
+		** grow as needed during parsing and normal data processing
+		*/
+
 		struct {	/* Object */
 			unsigned int olen;
-			char 			  **keys;
-			struct thing_t_st **vals;
-			hashtable_t  	  *ht;
+			llm_t *key_first;	// Data type: pair_t *
+			llm_t *key_last;
+ 
+			hashtable_t *ht;
+			unsigned int useht;
 		};
 		
 		struct {	/* Array */
 			unsigned int alen;	// Current length
 			unsigned int maxlength; // Max possible length
-			struct thing_t_st **c;	// Contents: dynamic array of pointers to llm_t's
+			llm_t *c_first;	// Data type: thing_t *
+			llm_t *c_last;	
 		};
 	};
 
@@ -62,18 +73,26 @@ struct thing_t_st {
 
 typedef struct thing_t_st thing_t;
 
+struct pair_t_st {
+	char *key;
+	thing_t *val;
+};
+typedef struct pair_t_st pair_t;
+
+
 thing_t * new_scal(char *, type_t);
 void del_scal(thing_t *);
 thing_t * new_arr(unsigned int);
 int addelem(thing_t *, int, thing_t *);
 thing_t * getarrval(thing_t *, unsigned int);
 thing_t * new_obj(unsigned int);
-nament_t * addkv(thing_t *, char *, thing_t *);
-thing_t * getobjval(thing_t *, char *);
-void print_scalar(thing_t *);
-void print_arr(thing_t *);
-void print_obj(thing_t *);
-void print_thing(thing_t *);
+pair_t * addkv(thing_t *, pair_t *);
+pair_t * getobjval(thing_t *, char *);
+pair_t * new_pair(char *, thing_t *);
+void print_scalar(thing_t *, unsigned int *);
+void print_arr(thing_t *, unsigned int *);
+void print_obj(thing_t *, unsigned int *);
+void print_thing(thing_t *, unsigned int *);
 
 
 /* TYPES_H */

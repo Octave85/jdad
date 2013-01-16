@@ -16,6 +16,32 @@ llm_t * new_llm(void *value, llm_t *next)
 	return newllm;
 }
 
+pair_t * new_pair(char *key, thing_t *val)
+{
+	pair_t *newpair = c_malloc(sizeof(pair_t));
+
+	if (newpair)
+	{
+		newpair->key = key;
+		newpair->val = val;
+	}
+
+	return newpair;
+}
+
+llm_t * addback(llm_t *last, void *add)
+{
+	llm_t *newllm = new_llm(add, NULL);
+	
+	if (newllm == NULL) return last;
+		
+	if (last == NULL) 
+		last = newllm;
+	else
+		last->next = newllm;
+
+	return newllm;
+}
 
 thing_t * new_scal(char *stringval, type_t type)
 {
@@ -43,11 +69,11 @@ thing_t * new_arr(unsigned int maxlength)
 {
 	thing_t *newarr = c_malloc(sizeof(thing_t));
 	
-	newarr->type      = Array;
-	aa(newarr, alen)    = 0;
+	aa(newarr, type)      = Array;
+	aa(newarr, alen)      = 0;
 	aa(newarr, maxlength) = maxlength;
-	aa(newarr, c)         = 
-		(thing_t **)c_calloc(maxlength, sizeof(thing_t));
+	aa(newarr, c_first)	= NULL;
+	aa(newarr, c_last) = NULL;
 
 	return newarr;
 }
@@ -57,24 +83,24 @@ int addelem(thing_t *arr, int ind, thing_t *value)
 	if (ind < 0)
 		ind = aa(arr, alen);
 
-	if (++(aa(arr, alen)) > aa(arr, maxlength))
-	{
-		(aa(arr, alen))--;
-		return -1;
-	}
+	aa(arr, c_last) = addback(oa(arr, c_last), value);
 
-	aa(arr, c)[ind] = value;
+	if (aa(arr, c_first) == NULL)
+		aa(arr, c_first) = aa(arr, c_last);
 
+	aa(arr, alen)++;
 
 	return ind;
 }
 
 thing_t * getarrval(thing_t *arr, unsigned int ind)
 {
-	if (ind < aa(arr, alen))
-		return aa(arr, c)[ind];
+	llm_t *cur = oa(arr, c_first);
 
-	return NULL;
+	while (cur != NULL && ind--)
+		cur = cur->next;
+
+	return (thing_t *)cur->data;
 }
 
 void del_arr(thing_t *arr)
@@ -96,43 +122,67 @@ thing_t * new_obj(unsigned int length)
 
 	if (newobj)
 	{
-		newobj->type 		= Object;
+		oa(newobj, type) 	= Object;
 		oa(newobj, olen)	= 0;	// Current number of k/v pairs
-		oa(newobj, keys) 	= 
-			(thing_t **)c_calloc(length, sizeof(thing_t));
-		oa(newobj, vals) 	= 
-			(thing_t **)c_calloc(length, sizeof(thing_t));
-		oa(newobj, ht)   	= new_hashtable(length);	// "full" number
+		oa(newobj, ht)   	= NULL;
+		oa(newobj, useht)	= 0;
+		oa(newobj, key_first) = NULL;
+		oa(newobj, key_last) = NULL;
 	} 
 
 	return newobj;
 }
 
-nament_t * addkv(thing_t *object, char *key, thing_t *value)
+pair_t * addkv(thing_t *object, pair_t *pair)
 {
-	// Add key to object's key table
-	nament_t *newk = addentry(oa(object, ht), key);
-	// Point key to value
-	newk->first->val = value;
-	// Append key to keyname list
-	oa(object, keys)[oa(object, olen)] = key;
-	oa(object, vals)[oa(object, olen)] = value;
-	
-	oa(object, olen)++;
-
-	return newk;
-}
-
-thing_t * getobjval(thing_t *obj, char *key)
-{
-	nament_t *entry = getentry(oa(obj, ht), key);
-
-	if (entry)
+	if (oa(object, useht))
 	{
-		return (thing_t *)entry->first->val;
+		// Add key to object's key table
+		nament_t *newk = addentry(oa(object, ht), pair->key);
+		// Point key to value
+		newk->first->val = pair->val;
 	}
 
-	return NULL;
+	oa(object, key_last) = addback(oa(object, key_last), pair);
+	
+	if (oa(object, key_first) == NULL)
+	{
+		oa(object, key_first) = oa(object, key_last);
+	}
+
+	oa(object, olen)++;
+
+	return pair;
+}
+
+pair_t * getobjval(thing_t *obj, char *key)
+{
+	/*if (oa(obj, useht))
+	{
+		nament_t *entry = getentry(oa(obj, ht), key);
+
+		if (entry)
+		{
+			return (thing_t *)entry->first->val;
+		}
+
+		return NULL;
+	}*/
+
+	llm_t *key_list = oa(obj, key_first);
+
+	pair_t *k = (pair_t *)key_list->data;
+
+	while (key_list != NULL)
+	{
+		if ( ! strncmp(key, k->key, strlen(key)))
+			break;
+
+		key_list = key_list->next;
+		k = (pair_t *)key_list->data;
+	}
+
+	return k;
 }
 
 void del_obj(thing_t *obj)
@@ -144,7 +194,13 @@ void del_obj(thing_t *obj)
 	}
 }
 
-void print_scalar(thing_t *sc)
+void nl(unsigned int level)
+{
+	putchar('\n');
+	while (level--) printf("  ");
+}
+
+void print_scalar(thing_t *sc, unsigned int *level)
 {
 	switch (sa(sc, stype))
 	{
@@ -176,60 +232,67 @@ void print_scalar(thing_t *sc)
 	}
 }
 
-void print_obj(thing_t *obj)
+void print_obj(thing_t *obj, unsigned int *level)
 {
-	char *key;
-	thing_t *value;
+	llm_t *key_list = oa(obj, key_first);
+	pair_t *k;
 
-	printf("{ ");
+	printf("{");
+	nl(++*level);
 
 	/* In progress: turn keys[] into an array instead of an LL
 	** and add values to valuesp[] array. Change array values to 
 	** **thing_t instead of llm_t */
 	int i = 0;
-	for (; i < oa(obj, olen) - 1; i++)
+	while (key_list != NULL)
 	{
-		key   = oa(obj, keys)[i];
-		value = oa(obj, vals)[i];
+		k = (pair_t *)key_list->data;
 
-		printf("\"%s\": ", key);
-		print_thing(value);
+		printf("\"%s\": ", k->key);
+		print_thing(k->val, level);
 		printf(", ");
+
+		key_list = key_list->next;
+		nl(*level);
 	}
 
-	printf("\"%s\": ", oa(obj, keys)[i]);
-	print_thing(oa(obj, vals)[i]);
-
-	printf(" }\n");
+	nl(--*level);
+	printf("}");
 }
 
-void print_arr(thing_t *arr)
+void print_arr(thing_t *arr, unsigned int *level)
 {
-	printf("[ ");
-	int i;
-	for (i = 0; i < aa(arr, olen) - 1; i++)
+	printf("[");
+	nl(++*level);
+
+	llm_t *cur = aa(arr, c_first);
+
+	while (cur->next != NULL)
 	{
-		print_thing(aa(arr, c)[i]);
+		print_thing((thing_t *)cur->data, level);
 		printf(", ");
+		cur = cur->next;
 	}
 
-	print_thing(aa(arr, c)[i]);
+	print_thing((thing_t *)cur->data, level);
 
-	printf(" ]");
+	nl(--*level);
+	printf("]");
+	nl(*level);
 }
 
-void print_thing(thing_t *thing)
+void print_thing(thing_t *thing, unsigned int *level)
 {
 	switch (thing->type)
 	{
 		case Scalar:
-			print_scalar(thing);
+			print_scalar(thing, level);
 			break;
 		case Object:
-			print_obj(thing);
+			print_obj(thing, level);
 			break;
 		case Array:
-			print_arr(thing);
+			print_arr(thing, level);
 			break;
 	}
 }
@@ -239,7 +302,6 @@ void TEST_obj(void)
 	// Test: add some values to an object
 	thing_t *test = new_obj(3);
 
-	nament_t *key;
 	thing_t *value  = new_scal("1234", Doble);
 	thing_t *value2 = new_scal("hey guise", String);
 
@@ -247,14 +309,19 @@ void TEST_obj(void)
 	sa(value, number).doble = 1234.f;
 	sa(value, number).exp = 0;
 
+	pair_t *key1 = new_pair("key1", value);
+
 	// Add the key and value
-	key = addkv(test, "key1", value);
+	addkv(test, key1);
 
 	sa(value2, string) = "hey guise";
 
-	key = addkv(test, "key2", value2);
+	pair_t *key2 = new_pair("key2", value2);
 
-	print_obj(test);
+	addkv(test, key2);
+
+	unsigned int level = 0;
+	print_obj(test, &level);
 
 }
 
@@ -282,7 +349,8 @@ void TEST_arr(void)
 	addelem(val3, ARR_A, val4);
 	addelem(arr, ARR_A, val3);
 
-	print_thing(arr);
+	unsigned int level = 0;
+	print_thing(arr, &level);
 }
 /*
 int main(int argc, char **argv)

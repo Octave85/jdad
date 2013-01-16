@@ -10,12 +10,20 @@
 
 #define match(t) p->la = _match(t, p)
 
+void error(parser_t *p)
+{
+	printf("Unexpected token %s, aborting\n",
+		p->scan->str);
+
+	exit(-1);
+}
+
 token_t  _match(token_t t, parser_t *p)
 {
 	if (p->la == t)
 		return scan_json(p->scan);
 	else
-		printf("errrr\n");
+		error(p);
 }
 
 char *new_copy(char *str, int len)
@@ -29,19 +37,36 @@ char *new_copy(char *str, int len)
 	return newcopy;
 }
 
-node_t * new_node(unsigned int len, type_t type, thing_t *thing)
+thing_t * truthval(parser_t *p)
 {
-	node_t *newnode = (node_t *)malloc(sizeof(node_t));
+	thing_t *newtr;
+	switch (p->la)
+	{
+		case tTrue:
+			match(tTrue);
+			newtr = new_scal("True", Truthval);
+			sa(newtr, truthval) = True;
+			break;
+		case tFalse:
+			match(tFalse);
+			newtr = new_scal("False", Truthval);
+			sa(newtr, truthval) = False;
+			break;
+		case tNull:
+			match(tNull);
+			newtr = new_scal("Null", Truthval);
+			sa(newtr, truthval) = Null;
+			break;
+		default:
+			printf("errrrr\n");
+			exit(-1);
+			break;
+	}
 
-	newnode->type = type;
-	newnode->thing = thing;
-	newnode->length = len;
-	newnode->next = NULL;
-
-	return newnode;
+	return newtr;
 }
 
-node_t * string(parser_t *p)
+thing_t * string(parser_t *p)
 {
 	// Get rid of quotes
 	char *copy = new_copy(p->scan->str + 1, 
@@ -52,12 +77,12 @@ node_t * string(parser_t *p)
 
 	match(tString);
 
-	node_t *strnode = new_node(0, Scalar, newstr);
+	//node_t *strnode = new_node(0, Scalar, newstr);
 
-	return strnode;
+	return newstr;
 }
 
-node_t * doble(parser_t *p)
+thing_t * doble(parser_t *p)
 {
 	char *copy = new_copy(p->scan->str, 0);
 
@@ -75,39 +100,52 @@ node_t * doble(parser_t *p)
 		sa(newdob, number).exp = 0;
 	}
 
-	node_t *dobnode = new_node(0, Scalar, newdob);
+	//node_t *dobnode = new_node(0, Scalar, newdob);
 
-	return dobnode;
+	return newdob;
 }
 
-node_t * object(parser_t *p)
+thing_t * object(parser_t *p)
 {
-	unsigned int len = 0;
-	node_t *key; 
-	node_t *value;
-
-	node_t *newobj = new_node(0, Object, NULL);
+	thing_t *newobj = new_obj(0);
+	thing_t *aux;
 
 	while (p->la != tRCurl)
 	{
-		key = string(p);
-		len++;
-		match(tColon);
-		value = thing(p);
-		len++;
+		aux = string(p);
 		
-		key->next = newobj->next;
-		newobj->next = key;
-		value->next = newobj->next;
-		newobj->next = value;
+		match(tColon);
+
+		addkv(newobj, new_pair(aux->string, thing(p)));
+
+		if (p->la == tComma)
+			match(tComma);
 	}
 
 	match(tRCurl);
 
+
 	return newobj;
 }
 
-node_t * thing(parser_t *p)
+thing_t * array(parser_t *p)
+{
+	thing_t *newarr = new_arr(0);
+
+	while (p->la != tRBrace)
+	{
+		addelem(newarr, ARR_A, thing(p));
+
+		if (p->la == tComma)
+			match(tComma);
+	}
+
+	match(tRBrace);
+
+	return newarr;
+}
+
+thing_t * thing(parser_t *p)
 {
 	switch (p->la)
 	{
@@ -116,10 +154,10 @@ node_t * thing(parser_t *p)
 			return object(p);
 			break;
 
-		//case tLBrace:
-		//	match(tLBrace);
-		//	array(p);
-		//	break;
+		case tLBrace:
+			match(tLBrace);
+			return array(p);
+			break;
 
 		case tDoble:	// All primitives resolve to themselves
 			return doble(p);
@@ -130,19 +168,16 @@ node_t * thing(parser_t *p)
 			break;
 
 		case tNull:
-			match(tNull);
 		case tTrue:
-			match(tTrue);
 		case tFalse:
-			match(tFalse);
-			printf("%s\n", p->scan->str);
+			return truthval(p);
 
 		default:
-			printf("%s\n", p->scan->str);
+			error(p);
 
 	}
 
-	return (node_t *)NULL;
+	return (thing_t *)NULL;
 }
 
 
@@ -154,14 +189,16 @@ int main(int argc, char **argv)
 	p->scan->str = calloc(50, 1);
 	p->scan->file = open_json("test.json");
 
-	node_t *t;
+	thing_t *t;
+
+	unsigned int level = 0;
 
 	p->la = scan_json(p->scan);
 
 	while (p->la != tEnd)
 	{
 		t = thing(p);
-		//if (t) print_thing(t->thing);
+		if (t) print_thing(t, &level);
 
 		//del_scal(t);
 		t = NULL;
