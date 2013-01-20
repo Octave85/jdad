@@ -1,7 +1,6 @@
 #ifndef PRINT_H
 #define PRINT_H
 
-#include <stdarg.h>
 #include "types.h"
 #include "global.h"
 
