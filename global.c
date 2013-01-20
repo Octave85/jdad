@@ -1,7 +1,11 @@
 #include "global.h"
 
+int malloc_c = 0;
+size_t mem_c = 0;
+int free_c   = 0;
+
 void *c_malloc(size_t size)
-{
+{	
 	malloc_c++;
 	mem_c += size;
 

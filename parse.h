@@ -2,6 +2,7 @@
 #define PARSE_H
 
 #include "scan.h"
+#include "print.h"
 
 #define copy_sansquotes(str) new_copy(str + 1, strlen(str) - 2)
 

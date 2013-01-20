@@ -154,7 +154,7 @@ thing_t * array(parser_t *p)
 
 	while (p->la != tRBrace)
 	{
-		addelem(newarr, ARR_A, thing(p));
+		addelem(newarr, thing(p));
 
 		if (p->la == tComma)
 			match(tComma);
@@ -241,6 +241,13 @@ parser_t *new_parser(char *filename)
 	return newp;
 }
 
+parser_t *parser_reopen(parser_t *p, char *filename)
+{
+	p->scan->file = open_json(filename);
+
+	return p;
+}
+
 void parser_quit(parser_t *p)
 {
 	if (p->data)
@@ -264,6 +271,7 @@ int main(int argc, char **argv)
 	}
 
 	parser_t *p = new_parser(argv[1]);
+	printer_t *print = new_printer(NULL);
 
 	unsigned int level = 0, ctr = 0;
 
@@ -274,10 +282,11 @@ int main(int argc, char **argv)
 		t = p->data;
 
 		fprintf(stderr, "[%d]\n", ctr++);
-		print_thing(t, &level);
+		print_thing(print, t);
 		del_thing(t);
 	}
 
+	del_printer(print);
 	parser_quit(p);
 
 	fprintf(stderr, "MEM STATS:\n");

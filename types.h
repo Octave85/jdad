@@ -21,7 +21,9 @@
 	} number;	\
 	truthval_t truthval;
 
-typedef enum { String, Doble, Truthval, Object, Array, Scalar, Thing } type_t;
+typedef enum { Object, Array, Scalar   } type_t;	// Thing type
+
+typedef enum { String, Doble, Truthval } stype_t;	// Scalar type
 
 struct llm_t_st {	// General linked list member/data container.
 	void *data;
@@ -43,7 +45,7 @@ struct thing_t_st {
 				ATOM_UNION;
 			};
 			char *stringval;
-			type_t stype;
+			stype_t stype;
 		};
 		
 		struct {	/* Object */
@@ -75,22 +77,21 @@ struct pair_t_st {
 typedef struct pair_t_st pair_t;
 
 
-thing_t * new_scal(char *, type_t);
+llm_t *new_llm(void *, llm_t *);
+
+thing_t * new_scal(char *, stype_t);
 void del_scal(thing_t *);
+
 thing_t * new_arr(unsigned int);
-int addelem(thing_t *, int, thing_t *);
+int addelem(thing_t *, thing_t *);
 thing_t * getarrval(thing_t *, unsigned int);
 void del_arr(thing_t *);
+
 thing_t * new_obj(unsigned int);
 pair_t * addkv(thing_t *, pair_t *);
 pair_t * getobjval(thing_t *, char *);
 pair_t * new_pair(char *, thing_t *);
 void del_obj(thing_t *);
-void print_scalar(thing_t *, unsigned int *);
-void print_arr(thing_t *, unsigned int *);
-void print_obj(thing_t *, unsigned int *);
-void print_thing(thing_t *, unsigned int *);
-
 
 /* TYPES_H */
 #endif

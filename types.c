@@ -1,10 +1,5 @@
 #include "types.h"
 
-int malloc_c = 0;
-size_t mem_c = 0;
-
-int free_c = 0;
-
 char bbuf[128] = "";
 int bbuf_len = 0;
 
@@ -48,7 +43,7 @@ llm_t * addback(llm_t *last, void *add)
 	return newllm;
 }
 
-thing_t * new_scal(char *stringval, type_t type)
+thing_t * new_scal(char *stringval, stype_t type)
 {
 	thing_t *newscal = (thing_t *)c_malloc(sizeof(thing_t));
 	newscal->type = Scalar;
@@ -86,11 +81,8 @@ thing_t * new_arr(unsigned int maxlength)
 	return newarr;
 }
 
-int addelem(thing_t *arr, int ind, thing_t *value)
+int addelem(thing_t *arr, thing_t *value)
 {
-	if (ind < 0)
-		ind = aa(arr, alen);
-
 	aa(arr, c_last) = addback(oa(arr, c_last), value);
 
 	if (aa(arr, c_first) == NULL)
@@ -98,7 +90,7 @@ int addelem(thing_t *arr, int ind, thing_t *value)
 
 	aa(arr, alen)++;
 
-	return ind;
+	return 1;
 }
 
 thing_t * getarrval(thing_t *arr, unsigned int ind)
@@ -239,120 +231,6 @@ void del_thing(thing_t *t)
 	}
 }
 
-void nl(unsigned int level)
-{
-	if (bbuf[bbuf_len-1] != '\n')
-	{
-		bputc('\n');
-		putchar('\n');
-	}
-	else
-	{
-		bflush();
-	}
-
-	while (level--) printf("  ");
-}
-
-void print_scalar(thing_t *sc, unsigned int *level)
-{
-	switch (sa(sc, stype))
-	{
-		case Doble:
-			printf("%.3f", sa(sc, number).doble);
-			if (sa(sc, number).exp > 0)
-			{
-				putchar('e');
-				printf("%d", sa(sc, number).exp);
-			}
-			break;
-		case String:
-			printf ("\"%s\"", sa(sc, string));
-			break;
-		case Truthval:
-			switch (sa(sc, truthval))
-			{
-				case False:
-					printf("False");
-					break;
-				case True:
-					printf("True");
-					break;
-				case Null:
-					printf("Null");
-					break;
-			}
-			break;
-		default:
-			printf("Unrecognized scalar type to print\n");
-	}
-}
-
-void print_obj(thing_t *obj, unsigned int *level)
-{
-	llm_t *key_list = oa(obj, key_first);
-	pair_t *k;
-
-	printf("{");
-	nl(++*level);
-
-	while (key_list != NULL)
-	{
-		k = (pair_t *)key_list->data;
-
-		printf("\"%s\": ", k->key);
-		print_thing(k->val, level);
-		printf(", ");
-
-		key_list = key_list->next;
-		nl(*level);
-	}
-
-	nl(--*level);
-	printf("}");
-}
-
-void print_arr(thing_t *arr, unsigned int *level)
-{
-	printf("[");
-
-	llm_t *cur = aa(arr, c_first);
-
-	if (cur)
-	{
-		nl(++*level);
-		while (cur && (cur->next != NULL))
-		{
-			print_thing((thing_t *)cur->data, level);
-			printf(", ");
-			cur = cur->next;
-		}
-		print_thing((thing_t *)cur->data, level);
-
-		nl(--*level);
-	}
-
-	printf("]");
-	nl(*level);
-}
-
-void print_thing(thing_t *thing, unsigned int *level)
-{
-	switch (thing->type)
-	{
-		case Scalar:
-			print_scalar(thing, level);
-			break;
-		case Object:
-			print_obj(thing, level);
-			break;
-		case Array:
-			print_arr(thing, level);
-			break;
-		default:
-			printf("Unrecognized Object to print\n");
-	}
-}
 
 void TEST_obj(void)
 {
@@ -392,8 +270,8 @@ void TEST_arr(void)
 	sa(val1, string) = "hehe";
 	sa(val2, string) = "nonono";
 
-	addelem(arr, ARR_A, val1);
-	addelem(arr, ARR_A, val2);
+	addelem(arr, val1);
+	addelem(arr, val2);
 
 	// Nested array
 
@@ -403,8 +281,8 @@ void TEST_arr(void)
 	sa(val4, number).doble = 40.f;
 	sa(val4, number).exp = 0;
 
-	addelem(val3, ARR_A, val4);
-	addelem(arr, ARR_A, val3);
+	addelem(val3, val4);
+	addelem(arr, val3);
 
 	unsigned int level = 0;
 	print_thing(arr, &level);
