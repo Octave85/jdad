@@ -3,22 +3,22 @@
 
 #include "scan.h"
 
-#define OBJ_GUESS 5
+#define copy_sansquotes(str) new_copy(str + 1, strlen(str) - 2)
 
 typedef enum {
-	Thing,
-	Doble,
-	String,
-	ObjKey,
-	ObjVal,
-	Arr,
+	pThing,
+	pDoble,
+	pString,
+	pObjKey,
+	pObjVal,
+	pArr,
 } pstate_t;
 
 typedef struct {
 	scanner_t *scan;
 	token_t la;
 	pstate_t state;
-	thing_t **data;
+	thing_t *data;
 } parser_t;
 
 struct node_t_st {
@@ -27,6 +27,8 @@ struct node_t_st {
 }; 
 
 typedef struct node_t_st node_t;
+parser_t * new_parser(char *);
+int parse(parser_t *p);
 
 thing_t * thing(parser_t *);
 thing_t * object(parser_t *);

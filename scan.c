@@ -14,14 +14,14 @@ case '9'
 
 #define nextc() _nextc(sc->file, sc->str)
 #define prevc() _prevc(c, sc->file, sc->str)
-#define sspaces() _sspaces(c, sc->file, sc->str)
+#define schars() _schars(c, sc->file, sc->str)
 #define error() _error(c, sc)
 
 #define unex() error(); *state = Error; tok = tErr;
 #define accept(tt) *state = Accept; tok = tt;
 #define accept_pb(tt) prevc(); accept(tt);
 
-
+static unsigned int lineno = 1;
 
 FILE * open_json(char *filename)
 {
@@ -33,7 +33,7 @@ FILE * open_json(char *filename)
 	}
 	else
 	{
-		printf("Error openixng file.\n");
+		fprintf(stderr, "Error opening file.\n");
 		exit(1);
 	}
 }
@@ -42,6 +42,8 @@ int _nextc(FILE *file, char *str)
 {
 	int l, c;
 	c = getc(file);
+
+	lineno += (c == '\n');
 
 	if (str != NULL)
 	{
@@ -69,14 +71,14 @@ int _prevc(int c, FILE *file, char *str)
 
 int _error(int c, scanner_t *sc)
 {
-	printf("Unexpected %c in stream (in state %d)"
-		" (Had partial token %s)\n", c, sc->state, sc->str);
+	printf("Unexpected %c (%d) in stream at line %d (in state %d)"
+		" (Had partial token %s)\n", c, c, lineno, sc->state, sc->str);
 	sc->errors++;
 	
 	return 1;
 }
 
-void _sspaces(int c, FILE *file, char *str)
+void _schars(int c, FILE *file, char *str)
 {
 	// Skip spaces
 	while (isspace(c))
@@ -93,10 +95,10 @@ token_t scan_json(scanner_t *sc)
 	state_t *state = &(sc->state);
 	*state = Start;
 
-	int c, i = 0;
+	int c;
 	memset(sc->str, 0, strlen(sc->str));
 
-	for (;;i++)
+	for (;;)
 	{
 		
 		switch (*state)
@@ -106,6 +108,7 @@ token_t scan_json(scanner_t *sc)
 
 				switch (c)
 				{
+					
 					case '{':
 						accept(tLCurl);
 						break;
@@ -173,7 +176,7 @@ token_t scan_json(scanner_t *sc)
 					default:
 						if (isspace(c))
 						{
-							sspaces();
+							schars();
 						}
 						else
 						{
@@ -416,6 +419,10 @@ token_t scan_json(scanner_t *sc)
 					unex();
 				}
 				break; // InN3;
+
+			default:
+				printf("Internal error: unexpected state %d\n", *state);
+				return tErr;
 
 		
 		// End of state switch

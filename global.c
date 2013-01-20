@@ -15,3 +15,22 @@ void *c_calloc(size_t count, size_t size)
 
 	return calloc(count, size);
 }
+
+inline void c_free(void *mem)
+{
+	free_c++;
+
+	free(mem);
+}
+
+void bputc(int c)
+{
+	bbuf[bbuf_len++] = c;
+}
+
+void bflush(void)
+{
+	printf("%s", bbuf);
+	memset(bbuf, 0, bbuf_len);
+	bbuf_len = 0;
+}

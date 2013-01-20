@@ -3,6 +3,11 @@
 int malloc_c = 0;
 size_t mem_c = 0;
 
+int free_c = 0;
+
+char bbuf[128] = "";
+int bbuf_len = 0;
+
 llm_t * new_llm(void *value, llm_t *next)
 {
 	llm_t *newllm = c_malloc(sizeof(llm_t));
@@ -55,14 +60,17 @@ thing_t * new_scal(char *stringval, type_t type)
 
 void del_scal(thing_t *scal)
 {
-	if (scal->stype == String)
-	{
-		free(scal->string);
-	}
+	/* Problem: these may or may not be malloc'd(),
+	** so we can get a segfault by freeing them.
+	*/
+	//if (sa(scal, stype) == String)
+	//{
+	//	c_free(sa(scal, string));
+	//}
 
-	free(scal->stringval);
+	//c_free(sa(scal, stringval));
 
-	free(scal);
+	c_free(scal);
 }
 
 thing_t * new_arr(unsigned int maxlength)
@@ -105,14 +113,20 @@ thing_t * getarrval(thing_t *arr, unsigned int ind)
 
 void del_arr(thing_t *arr)
 {
-	int i;
+	llm_t *lm = aa(arr, c_first), *nx;
+	thing_t *da;
 
-	for (i = 0; i < aa(arr, alen); i++)
+	while (lm != NULL)
 	{
-		//del_thing(aa(arr, c)[i]);
+		da = (thing_t *)lm->data;
+		del_thing(da);
+
+		nx = lm->next;
+		c_free(lm);
+		lm = nx;
 	}
 
-	free(arr);
+	c_free(arr);
 }
 
 
@@ -187,16 +201,56 @@ pair_t * getobjval(thing_t *obj, char *key)
 
 void del_obj(thing_t *obj)
 {
-	int i;
-	for (i = 0; i < oa(obj, olen); i++)
+	llm_t *lm = oa(obj, key_first), *nx;
+	
+	while (lm != NULL)
 	{
-		//del_thing(oa(obj, vals)[i]);
+		pair_t *pa = (pair_t *)lm->data;
+		del_thing(pa->val);
+		c_free(pa);
+
+		nx = lm->next;
+		c_free(lm);
+		
+		lm = nx;
+	}
+
+	c_free(obj);
+}
+
+void del_thing(thing_t *t)
+{
+	switch (t->type)
+	{
+		case Scalar:
+			del_scal(t);
+			break;
+
+		case Array:
+			del_arr(t);
+			break;
+
+		case Object:
+			del_obj(t);
+			break;
+
+		default:
+			printf("Illegal type for deletion\n");
 	}
 }
 
 void nl(unsigned int level)
 {
-	putchar('\n');
+	if (bbuf[bbuf_len-1] != '\n')
+	{
+		bputc('\n');
+		putchar('\n');
+	}
+	else
+	{
+		bflush();
+	}
+
 	while (level--) printf("  ");
 }
 
@@ -229,6 +283,8 @@ void print_scalar(thing_t *sc, unsigned int *level)
 					break;
 			}
 			break;
+		default:
+			printf("Unrecognized scalar type to print\n");
 	}
 }
 
@@ -240,10 +296,6 @@ void print_obj(thing_t *obj, unsigned int *level)
 	printf("{");
 	nl(++*level);
 
-	/* In progress: turn keys[] into an array instead of an LL
-	** and add values to valuesp[] array. Change array values to 
-	** **thing_t instead of llm_t */
-	int i = 0;
 	while (key_list != NULL)
 	{
 		k = (pair_t *)key_list->data;
@@ -263,20 +315,23 @@ void print_obj(thing_t *obj, unsigned int *level)
 void print_arr(thing_t *arr, unsigned int *level)
 {
 	printf("[");
-	nl(++*level);
 
 	llm_t *cur = aa(arr, c_first);
 
-	while (cur->next != NULL)
+	if (cur)
 	{
+		nl(++*level);
+		while (cur && (cur->next != NULL))
+		{
+			print_thing((thing_t *)cur->data, level);
+			printf(", ");
+			cur = cur->next;
+		}
 		print_thing((thing_t *)cur->data, level);
-		printf(", ");
-		cur = cur->next;
+
+		nl(--*level);
 	}
 
-	print_thing((thing_t *)cur->data, level);
-
-	nl(--*level);
 	printf("]");
 	nl(*level);
 }
@@ -294,6 +349,8 @@ void print_thing(thing_t *thing, unsigned int *level)
 		case Array:
 			print_arr(thing, level);
 			break;
+		default:
+			printf("Unrecognized Object to print\n");
 	}
 }
 

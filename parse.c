@@ -12,8 +12,8 @@
 
 void error(parser_t *p)
 {
-	printf("Unexpected token %s, aborting\n",
-		p->scan->str);
+	printf("Unexpected token %s(%d), aborting\n",
+		p->scan->str, p->la);
 
 	exit(-1);
 }
@@ -68,18 +68,22 @@ thing_t * truthval(parser_t *p)
 
 thing_t * string(parser_t *p)
 {
-	// Get rid of quotes
-	char *copy = new_copy(p->scan->str + 1, 
-		strlen(p->scan->str) - 2);
+	if (p->la == tString)
+	{
+		// Get rid of quotes
+		char *copy = copy_sansquotes(p->scan->str);
 
-	thing_t *newstr = new_scal(copy, String);
-	sa(newstr, string) = copy;
+		thing_t *newstr = new_scal(copy, String);
+		sa(newstr, string) = copy;
 
-	match(tString);
+		match(tString);
 
-	//node_t *strnode = new_node(0, Scalar, newstr);
+		//node_t *strnode = new_node(0, Scalar, newstr);
 
-	return newstr;
+		return newstr;
+	}
+
+	error(p);
 }
 
 thing_t * doble(parser_t *p)
@@ -108,18 +112,34 @@ thing_t * doble(parser_t *p)
 thing_t * object(parser_t *p)
 {
 	thing_t *newobj = new_obj(0);
-	thing_t *aux;
+	char *key;
 
 	while (p->la != tRCurl)
-	{
-		aux = string(p);
+	{		
+		/* "Quick and dirty" match of string to avoid wasting
+		** resources on making a thing_t * = string(p) on every
+		** key. We just want the string.
+		*/
+		if (p->la == tString)
+		{
+			key = copy_sansquotes(p->scan->str);
+			match(tString);
+		}
+		else
+		{
+			error(p);
+		}
 		
 		match(tColon);
 
-		addkv(newobj, new_pair(aux->string, thing(p)));
+		addkv(newobj, new_pair(key, thing(p)));
 
 		if (p->la == tComma)
 			match(tComma);
+		else if (p->la == tRCurl)
+			break;
+		else
+			error(p);
 	}
 
 	match(tRCurl);
@@ -138,6 +158,10 @@ thing_t * array(parser_t *p)
 
 		if (p->la == tComma)
 			match(tComma);
+		else if (p->la == tRBrace)
+			break;
+		else
+			error(p);
 	}
 
 	match(tRBrace);
@@ -147,6 +171,13 @@ thing_t * array(parser_t *p)
 
 thing_t * thing(parser_t *p)
 {
+	/* Can't just make this a case with fall-through... the p->la
+	** considered by the switch doesn't change to the newly-matched token.
+	** pre-stored or put in register, maybe?
+	*/
+	if (p->la == tBegin)
+		match(tBegin);
+
 	switch (p->la)
 	{
 		case tLCurl:
@@ -172,6 +203,12 @@ thing_t * thing(parser_t *p)
 		case tFalse:
 			return truthval(p);
 
+		case tErr:
+			error(p);
+
+		case tEnd:
+			return NULL;
+
 		default:
 			error(p);
 
@@ -180,30 +217,72 @@ thing_t * thing(parser_t *p)
 	return (thing_t *)NULL;
 }
 
+int parse(parser_t *p)
+{
+	p->data = thing(p);
+
+	return (p->data != NULL);
+}
+
+parser_t *new_parser(char *filename)
+{
+	parser_t *newp = c_malloc(sizeof(parser_t));
+
+	if (newp)
+	{
+		newp->scan = c_malloc(sizeof(scanner_t));
+		if (newp->scan)
+			newp->scan->str = c_calloc(SCANBUF_SIZE, sizeof(char));
+		newp->scan->file = open_json(filename);
+
+		newp->la = tBegin;
+	}
+
+	return newp;
+}
+
+void parser_quit(parser_t *p)
+{
+	if (p->data)
+		del_thing(p->data);
+
+	c_free(p->scan->str);
+
+	fclose(p->scan->file);
+
+	c_free(p->scan);
+
+	c_free(p);
+}
 
 int main(int argc, char **argv)
 {
-	parser_t *p = malloc(sizeof(parser_t));
-
-	p->scan = malloc(sizeof(scanner_t));
-	p->scan->str = calloc(50, 1);
-	p->scan->file = open_json("test.json");
-
-	thing_t *t;
-
-	unsigned int level = 0;
-
-	p->la = scan_json(p->scan);
-
-	while (p->la != tEnd)
+	if (argc < 2)
 	{
-		t = thing(p);
-		if (t) print_thing(t, &level);
-
-		//del_scal(t);
-		t = NULL;
-		putchar('\n');
+		fprintf(stderr, "no filename supplied.\n");
+		exit(-1);
 	}
+
+	parser_t *p = new_parser(argv[1]);
+
+	unsigned int level = 0, ctr = 0;
+
+	register thing_t *t;
+
+	while (parse(p))
+	{
+		t = p->data;
+
+		fprintf(stderr, "[%d]\n", ctr++);
+		print_thing(t, &level);
+		del_thing(t);
+	}
+
+	parser_quit(p);
+
+	fprintf(stderr, "MEM STATS:\n");
+	fprintf(stderr, "Allocs: %d\nBytes: %d\n", malloc_c, mem_c);
+	fprintf(stderr, "Frees: %d\n", free_c);
 
 	return 0; 
 }

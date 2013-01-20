@@ -46,11 +46,6 @@ struct thing_t_st {
 			type_t stype;
 		};
 		
-		/* Make objects and arrays use dynamic linked lists
-		** as opposed to once-allocated arrays so that they can
-		** grow as needed during parsing and normal data processing
-		*/
-
 		struct {	/* Object */
 			unsigned int olen;
 			llm_t *key_first;	// Data type: pair_t *
@@ -85,10 +80,12 @@ void del_scal(thing_t *);
 thing_t * new_arr(unsigned int);
 int addelem(thing_t *, int, thing_t *);
 thing_t * getarrval(thing_t *, unsigned int);
+void del_arr(thing_t *);
 thing_t * new_obj(unsigned int);
 pair_t * addkv(thing_t *, pair_t *);
 pair_t * getobjval(thing_t *, char *);
 pair_t * new_pair(char *, thing_t *);
+void del_obj(thing_t *);
 void print_scalar(thing_t *, unsigned int *);
 void print_arr(thing_t *, unsigned int *);
 void print_obj(thing_t *, unsigned int *);

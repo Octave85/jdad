@@ -5,6 +5,8 @@
 #include <ctype.h>
 #include <stdlib.h>
 
+#define SCANBUF_SIZE 128
+
 typedef enum {
 	tLCurl,   // 0
 	tRCurl,   // 1
@@ -22,6 +24,7 @@ typedef enum {
 	tEscape,  // 13
 	tEnd,     // 14
 	tErr,	  // 15
+	tBegin,	  // 16
 } token_t;
 
 typedef enum {
