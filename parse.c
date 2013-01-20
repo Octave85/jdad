@@ -271,7 +271,7 @@ int main(int argc, char **argv)
 	}
 
 	parser_t *p = new_parser(argv[1]);
-	printer_t *print = new_printer(NULL);
+	printer_t *print = new_printer(NULL, Compact);
 
 	unsigned int level = 0, ctr = 0;
 
@@ -289,7 +289,7 @@ int main(int argc, char **argv)
 	del_printer(print);
 	parser_quit(p);
 
-	fprintf(stderr, "MEM STATS:\n");
+	fprintf(stderr, "\nMEM STATS:\n");
 	fprintf(stderr, "Allocs: %d\nBytes: %d\n", malloc_c, mem_c);
 	fprintf(stderr, "Frees: %d\n", free_c);
 

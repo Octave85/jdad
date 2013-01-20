@@ -81,12 +81,26 @@ Looking up an entry:
 	thing_t *found = getobjval(object, lookupstr);
 
 ## Printing
+### Pretty
+Prints full newlines and two-space indentation.
+### Compact
+Prints no newlines or indentation, good for using the fewest bytes possible.
+### Print Modes: Compile-Time
+To compile a printer that prints in a certain mode, compile with:
+	
+	-D X_PRINT	// X is one of PRETTY and COMPACT
+
+Or define X_PRINT before including jdad.h.
+
+### Print Modes: Run-Time
+You can also provide a mode (Pretty or Compact) to the printer_t constructor. 
+This will be somewhat slower than the compile-time mode choice, but it will provide greater flexibility in printing. 
 ### printer_t
 JSON printer.
 To construct:
 	
-	printer_t *prin = new_printer((FILE *)outstream); 
-	// Or NULL - defaults to stdout
+	printer_t *prin = new_printer((FILE *)outstream, 	// Or NULL - defaults to stdout
+		(printmode_t)mode); 	// Pretty or Compact; defaults to Pretty
 
 To destroy:
 
