@@ -85,7 +85,7 @@ Looking up an entry:
 JSON printer.
 To construct:
 	
-	printer_t prin = new_printer((FILE *)outstream); 
+	printer_t *prin = new_printer((FILE *)outstream); 
 	// Or NULL - defaults to stdout
 
 To destroy:
@@ -98,6 +98,7 @@ Note that you have to close the outstream on your own with:
 
 ### print_thing
 General, simple print function.
+	
 	print_thing((printer_t *)p, (thing_t*)th);
 
 ## Parsing
