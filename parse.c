@@ -12,7 +12,7 @@
 
 void error(parser_t *p)
 {
-	printf("Unexpected token %s(%d), aborting\n",
+	printf("Unexpected token %s (%d), aborting\n",
 		p->scan->str, p->la);
 
 	exit(-1);
