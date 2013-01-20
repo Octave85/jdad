@@ -1,32 +1,64 @@
 #include "print.h"
 
-printer_t * new_printer(FILE *ostream)
+printer_t * new_printer(FILE *ostream, printmode_t mode)
 {
 	printer_t *newprinter = c_malloc(sizeof(printer_t));
 
 	if (newprinter)
 	{
+		switch (mode)
+		{
+			case Compact:
+				newprinter->donl = newprinter->doin = 0;
+				break;
+
+		 /* case Pretty: */
+			default:
+				newprinter->donl = newprinter->doin = 1;
+				break;
+		}
+		
 		newprinter->level = 0;
-		newprinter->donl  = 1;
 		newprinter->ostream = (ostream != NULL) ? ostream : stdout;
 	}
 
 	return newprinter;
 }
 
-
-#define nl(PR_NAME) if (PR_NAME->donl) { princ(PR_NAME, '\n'); }
 #define princ(PR_NAME, c) fputc(c, pr->ostream)
 #define print(...) fprintf(PR_NAME->ostream, __VA_ARGS__)
 #define incin(PR_NAME) (PR_NAME->level++)
 #define decin(PR_NAME) (PR_NAME->level--)
 
-void in(printer_t *PR_NAME)
-{
-	unsigned int lvl = pr->level;
+/* PRETTY_PRINT and COMPACT_PRINT override programmatic
+** mode selection to speed things up. Allows one to compile
+** "pretty" and "compact" JSON printers.
+*/
+#ifdef PRETTY_PRINT
+#	define nl(PR_NAME) princ(PR_NAME, '\n')
 
-	while (lvl--) print("  ");
-}
+	void in(printer_t *PR_NAME)
+	{
+		unsigned int lvl = pr->level;
+		while (lvl--) print("  ");
+	}
+
+#else
+#	ifdef COMPACT_PRINT
+#		define nl(PR_NAME)
+#		define in(PR_NAME)
+#	else /* Define default functions that check the condition each time */
+#		define nl(PR_NAME) if (PR_NAME->donl) princ(PR_NAME, '\n')
+		void in(printer_t *PR_NAME)
+		{
+			if (PR_NAME->doin)
+			{
+				unsigned int lvl = pr->level;
+				while (lvl--) print("  ");
+			}
+		}
+#	endif
+#endif
 
 void print_scalar(printer_t *PR_NAME, thing_t *sc)
 {
@@ -62,10 +94,6 @@ void print_scalar(printer_t *PR_NAME, thing_t *sc)
 	}
 }
 
-#define pair_print(pair) print("\"%s\": ", k->key); \
-	print_thing(PR_NAME, k->val)
-#define pair_print_c(pair) pair_print(pair); princ(PR_NAME, ',')
-
 void print_obj(printer_t *PR_NAME, thing_t *obj)
 {
 	llm_t *key_list = oa(obj, key_first);
@@ -75,6 +103,10 @@ void print_obj(printer_t *PR_NAME, thing_t *obj)
 	
 	incin(PR_NAME);
 	nl(PR_NAME);
+
+#	define pair_print(pair) print("\"%s\": ", k->key); \
+	print_thing(PR_NAME, k->val)
+#	define pair_print_c(pair) pair_print(pair); princ(PR_NAME, ',')
 
 	while (key_list && (key_list->next != NULL))
 	{
@@ -97,10 +129,10 @@ void print_obj(printer_t *PR_NAME, thing_t *obj)
 	decin(PR_NAME);
 	in(PR_NAME);
 	print("}");
-}
 
-#define el_print(lm) print_thing(PR_NAME, (thing_t *)lm->data)
-#define el_print_c(lm) el_print(lm); princ(PR_NAME, ',');
+#	undef pair_print_c
+#	undef pair_print
+}
 
 
 void print_arr(printer_t *PR_NAME, thing_t *arr)
@@ -110,6 +142,9 @@ void print_arr(printer_t *PR_NAME, thing_t *arr)
 	nl(PR_NAME);
 
 	llm_t *cur = aa(arr, c_first);
+
+#	define el_print(lm) print_thing(PR_NAME, (thing_t *)lm->data)
+#	define el_print_c(lm) el_print(lm); princ(PR_NAME, ',');
 
 	if (cur)
 	{
@@ -133,6 +168,9 @@ void print_arr(printer_t *PR_NAME, thing_t *arr)
 	
 	decin(PR_NAME);
 	in(PR_NAME);
+
+#	undef el_print_c
+#	undef el_print
 
 	print("]");
 }
