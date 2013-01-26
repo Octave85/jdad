@@ -7,6 +7,8 @@
 
 #define SCANBUF_SIZE 128
 
+
+
 typedef enum {
 	tLCurl,   // 0
 	tRCurl,   // 1
@@ -40,6 +42,7 @@ typedef enum {
 
 typedef struct {
 	jchar *str;
+	unsigned int buflen;
 	state_t state;
 	unsigned int errors;
 	FILE *file;

@@ -73,7 +73,12 @@ void print_scalar(printer_t *PR_NAME, thing_t *sc)
 			}
 			break;
 		case String:
-			print("\"%s\"", sa(sc, string));
+			princ(PR_NAME, '"');
+			fwrite(sa(sc, string), 
+				   sa(sc, len) * sizeof(jchar), 
+				   1, 
+				   PR_NAME->ostream);
+			princ(PR_NAME, '"');
 			break;
 		case Truthval:
 			switch (sa(sc, truthval))

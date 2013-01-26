@@ -12,9 +12,9 @@ case '7': \
 case '8': \
 case '9' 
 
-#define nextc() _nextc(sc->file, sc->str)
-#define prevc() _prevc(c, sc->file, sc->str)
-#define schars() _schars(c, sc->file, sc->str)
+#define nextc() _nextc(sc->file, sc)
+#define prevc() _prevc(c, sc->file, sc->str, sc->buflen)
+#define schars() _schars(c, sc->file, sc->str, sc->buflen)
 #define error() _error(c, sc)
 
 #define unex() error(); *state = Error; tok = tErr;
@@ -38,32 +38,68 @@ FILE * open_json(jchar *filename)
 	}
 }
 
-int _nextc(FILE *file, jchar *str)
+jchar * _extendbuf(jchar *buf, unsigned int buflen)
 {
-	int l, c;
-	c = getc(file);
+	jchar *tmp = (jchar *)realloc(buf, (buflen + SCANBUF_SIZE));
+
+	if (tmp == NULL)
+	{
+		fprintf(stderr, "Error extending scanner buffer\n");
+		exit(1);
+	}
+
+
+	return tmp;
+}
+
+int _nextc(FILE *file, scanner_t *sc)
+{
+	unsigned int buflen = sc->buflen;
+	jchar *buf = sc->str;
+
+	int c = getc(file);
 
 	lineno += (c == '\n');
 
-	if (str != NULL)
+	if (buf != NULL)
 	{
-		l = strlen(str);
+		if ((buflen + 1) % SCANBUF_SIZE == 0)
+		{
+			sc->str = _extendbuf(buf, buflen);
+			
+			//fprintf(stderr, "Extended at %d\n", buflen);
+		}
 
 		// Add character and new null byte
-		str[l] = c;
-		str[l+1] = '\0';
+		buf[buflen] = c;
+		
+		/*if (buflen < 129 && buflen > 125)
+		{	
+			fprintf(stderr, "set buf[%d] to %d\n", buflen, c);
+			fprintf(stderr, "buf[127] = %d\n", buf[127]);
+		}*/
+		
+		buf[++buflen] = '\0';
+		
+		/*if (buflen < 130 && buflen > 125)
+		{
+			fprintf(stderr, "nulled buf[%d]\n", buflen);
+			fprintf(stderr, "buf[127] = %d\n", buf[127]);
+		}*/
+
+
+		sc->buflen = buflen;
 	}
 	
 	return c;
 }
 
-int _prevc(int c, FILE *file, jchar *str)
+int _prevc(int c, FILE *file, jchar *str, unsigned int len)
 {
 	if (str != NULL)
 	{	
-		int l = strlen(str);
 		// Shorten by one char
-		str[l-1] = '\0';
+		str[len-1] = '\0';
 	}
 
 	return ungetc(c, file);
@@ -78,7 +114,7 @@ int _error(int c, scanner_t *sc)
 	return 1;
 }
 
-void _schars(int c, FILE *file, jchar *str)
+void _schars(int c, FILE *file, jchar *str, unsigned int len)
 {
 	// Skip spaces
 	while (isspace(c))
@@ -86,7 +122,7 @@ void _schars(int c, FILE *file, jchar *str)
 		c = getc(file);
 	}
 	// Put back first nonspace
-	_prevc(c, file, str);
+	_prevc(c, file, str, len);
 }
 
 token_t scan_json(scanner_t *sc)
@@ -96,7 +132,8 @@ token_t scan_json(scanner_t *sc)
 	*state = Start;
 
 	int c;
-	memset(sc->str, 0, strlen(sc->str));
+	memset(sc->str, 0, SCANBUF_SIZE);
+	sc->buflen = 0;
 
 	for (;;)
 	{
@@ -166,7 +203,7 @@ token_t scan_json(scanner_t *sc)
 					case 'e':
 					case 'E':
 						*state = InExp;
-						sc->str[strlen(sc->str)-1] = '\0';
+						sc->str[sc->buflen-1] = '\0';
 						break;
 
 					case EOF:
@@ -431,21 +468,3 @@ token_t scan_json(scanner_t *sc)
 	// End of for loop
 	}
 }
-
-/*int main(int argc, char **argv)
-{
-	scanner_t *json = malloc(sizeof(scanner_t));
-	json->str = calloc(50, 1);
-	json->file = open_json("test.json");
-
-	token_t tok;
-
-	while ((tok = scan_json(json)) != tEnd)
-	{
-		if (tok != tErr) printf("Toke: %s (%d)\n", json->str, tok);
-	}
-	putchar('\n');
-
-	return 0;
-
-}*/

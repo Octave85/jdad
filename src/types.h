@@ -45,6 +45,7 @@ struct thing_t_st {
 			};
 			jchar *stringval;
 			stype_t stype;
+			unsigned int len;
 		};
 		
 		struct {	/* Object */

@@ -36,6 +36,16 @@ unsigned int jstrlen(jchar *jstr)
 	return len;
 }
 
+double jstrtod(jchar *jstr, jchar **rest)
+{
+	return strtod((const char *)jstr, rest);
+}
+
+long jstrtol(jchar *jstr, jchar **rest, unsigned int base)
+{
+	return strtol((const char *)jstr, rest, base);
+}
+
 void bputc(int c)
 {
 	bbuf[bbuf_len++] = c;

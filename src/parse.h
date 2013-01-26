@@ -4,7 +4,7 @@
 #include "scan.h"
 #include "print.h"
 
-#define copy_sansquotes(str) new_copy(str + sizeof(jchar), jstrlen(str) - 2 * sizeof(jchar))
+#define copy_sansquotes(str, len) new_copy(str + sizeof(jchar), len - 2 * sizeof(jchar))
 
 typedef enum {
 	pThing,

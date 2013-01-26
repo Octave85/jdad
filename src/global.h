@@ -19,7 +19,9 @@
 //#ifdef _WIN32 || _WIN64
 //	typedef unsigned int jchar;
 //#else
-	typedef char jchar;
+#define jchar char
+
+#define _s(str) (jchar *)str
 //#endif
 
 extern int malloc_c;
@@ -53,6 +55,8 @@ void JDAD_DLL *c_calloc(size_t, size_t);
 void JDAD_DLL c_free(void *);
 
 unsigned int jstrlen(jchar *);
+double jstrtod(jchar *, jchar **);
+long jstrtol(jchar *, jchar **, unsigned int);
 
 void bputc(int);
 void bflush(void);

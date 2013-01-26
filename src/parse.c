@@ -28,7 +28,7 @@ token_t  _match(token_t t, parser_t *p)
 
 jchar *new_copy(jchar *str, int len)
 {
-	len = ( ! len) ? jstrlen(str) : len;
+	len = ( ! len) ? jstrlen(_s(str)) : len;
 
 	jchar *newcopy = (jchar *)c_malloc(sizeof(jchar) * (len + 1));
 	newcopy = (jchar *)memcpy(newcopy, str, sizeof(jchar) * len);
@@ -44,17 +44,17 @@ thing_t * truthval(parser_t *p)
 	{
 		case tTrue:
 			match(tTrue);
-			newtr = new_scal("True", Truthval);
+			newtr = new_scal(_s("True"), Truthval);
 			sa(newtr, truthval) = True;
 			break;
 		case tFalse:
 			match(tFalse);
-			newtr = new_scal("False", Truthval);
+			newtr = new_scal(_s("False"), Truthval);
 			sa(newtr, truthval) = False;
 			break;
 		case tNull:
 			match(tNull);
-			newtr = new_scal("Null", Truthval);
+			newtr = new_scal(_s("Null"), Truthval);
 			sa(newtr, truthval) = Null;
 			break;
 		default:
@@ -71,10 +71,20 @@ thing_t * string(parser_t *p)
 	if (p->la == tString)
 	{
 		// Get rid of quotes
-		jchar *copy = copy_sansquotes(p->scan->str);
+		jchar *copy = copy_sansquotes(p->scan->str, p->scan->buflen);
 
 		thing_t *newstr = new_scal(copy, String);
+
 		sa(newstr, string) = copy;
+		sa(newstr, len) = p->scan->buflen - 2; // Account for quotes
+
+		/*printf("\nHex contents(2): ");
+		int i;
+		for (i = 0; i < p->scan->buflen; i++)
+			if (p->scan->str[i] == 0)
+				printf("NUL at %d\n", i);
+		*/
+		
 
 		match(tString);
 
@@ -91,12 +101,12 @@ thing_t * doble(parser_t *p)
 	jchar *copy = new_copy(p->scan->str, 0);
 
 	thing_t *newdob = new_scal(copy, Doble);
-	sa(newdob, number).doble = strtod(copy, NULL);
+	sa(newdob, number).doble = jstrtod(copy, NULL);
 	match(tDoble);
 
 	if (p->la == tExp)
 	{
-		sa(newdob, number).exp = strtol(p->scan->str, NULL, 0);
+		sa(newdob, number).exp = jstrtol(p->scan->str, NULL, 0);
 		match(tExp);
 	}
 	else
@@ -122,7 +132,7 @@ thing_t * object(parser_t *p)
 		*/
 		if (p->la == tString)
 		{
-			key = copy_sansquotes(p->scan->str);
+			key = copy_sansquotes(p->scan->str, p->scan->buflen);
 			match(tString);
 		}
 		else
