@@ -4,6 +4,7 @@
 #include <string.h>
 #include "global.h"
 
+
 #define ARR_A -1
 #define HT_THRESH 257
 
@@ -73,6 +74,7 @@ struct pair_t_st {
 };
 typedef struct pair_t_st pair_t;
 
+
 #ifdef __cplusplus
 extern "C" {
 #endif // Prevent name-mangling
@@ -80,6 +82,9 @@ extern "C" {
 llm_t *new_llm(void *, llm_t *);
 
 thing_t * JDAD_DLL new_scal(jchar *, stype_t);
+thing_t * JDAD_DLL new_string(jchar *);
+thing_t * JDAD_DLL new_doble(double, int);
+thing_t * JDAD_DLL new_truthval(truthval_t);
 void JDAD_DLL del_scal(thing_t *);
 
 thing_t * JDAD_DLL new_arr(unsigned int);

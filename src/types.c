@@ -55,7 +55,46 @@ thing_t * new_scal(jchar *stringval, stype_t type)
 	return newscal;
 }
 
-void del_scal(thing_t *scal)
+thing_t * new_string(jchar *stringval)
+{
+	thing_t *newstr = new_scal(stringval, String);
+	sa(newstr, string) = stringval;
+
+	return newstr;
+}
+
+thing_t * new_doble(double doble, int exponent)
+{
+	jchar *stringval = (jchar *)c_malloc(64);
+	thing_t *newdob = NULL;
+
+	if (stringval != NULL)
+	{
+		snprintf(stringval, 64, "%.3fe%d", doble, exponent);
+		newdob = new_scal(stringval, Doble);
+		sa(newdob, number.doble) = doble;
+		sa(newdob, number.exp  ) = exponent;
+	}
+
+	return newdob;
+}
+
+thing_t * new_truthval(truthval_t tv)
+{
+	jchar *stringval = (jchar *)c_malloc(6);
+	thing_t *newtv = NULL;
+
+	if (stringval != NULL)
+	{
+		snprintf(stringval, 6, "%s", tv2str[tv]);
+		newtv = new_scal(stringval, Truthval);
+		sa(newtv, truthval) = tv;
+	}
+
+	return newtv;
+}
+
+inline void del_scal(thing_t *scal)
 {
 	/* Problem: these may or may not be malloc'd(),
 	** so we can get a segfault by freeing them.
@@ -212,19 +251,3 @@ void del_thing(thing_t *t)
 			printf("Illegal type for deletion\n");
 	}
 }
-
-
-/*
-int main(int argc, char **argv)
-{
-	TEST_obj();
-	TEST_arr();
-	printf("\n%d", sizeof(thing_t));
-	putchar('\n');
-
-	printf("MEM STATS:\n"
-		   "Malloc/Callocs: %d\n"
-		   "Bytes allocated: %d\n", malloc_c, mem_c);
-
-	return 0;
-}*/
