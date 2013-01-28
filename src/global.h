@@ -34,6 +34,12 @@ extern int bbuf_len;
 enum Truthval_E { False, True, Null };
 typedef enum Truthval_E truthval_t;
 
+/* Used in print.c and types.c */
+static const char tv2str[][6] = {
+	"false", "true", "null",
+};
+
+
 #define TRUE 1
 #define FALSE 0
 
