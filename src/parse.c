@@ -76,7 +76,7 @@ thing_t * string(parser_t *p)
 		thing_t *newstr = new_scal(copy, String);
 
 		sa(newstr, string) = copy;
-		sa(newstr, len) = p->scan->buflen - 2; // Account for quotes
+		sa(newstr, len) = p->scan->buflen ;
 
 		/*printf("\nHex contents(2): ");
 		int i;
@@ -251,6 +251,11 @@ parser_t *new_parser(jchar *filename)
 	}
 
 	return newp;
+}
+
+inline int parse_eof(parser_t *p)
+{
+	return feof(p->scan->file);
 }
 
 parser_t *parser_reopen(parser_t *p, jchar *filename)

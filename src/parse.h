@@ -4,7 +4,7 @@
 #include "scan.h"
 #include "print.h"
 
-#define copy_sansquotes(str, len) new_copy(str + sizeof(jchar), len - 2 * sizeof(jchar))
+#define copy_sansquotes(str, len) new_copy(str, len * sizeof(jchar))
 
 typedef enum {
 	pThing,
@@ -35,6 +35,7 @@ extern "C" {
 
 parser_t * JDAD_DLL new_parser(jchar *);
 int JDAD_DLL parse(parser_t *);
+int JDAD_DLL parse_eof(parser_t *);
 parser_t * JDAD_DLL parser_reopen(parser_t *, jchar *);
 void JDAD_DLL parser_quit(parser_t *);
 
