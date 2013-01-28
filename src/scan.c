@@ -12,17 +12,6 @@ case '7': \
 case '8': \
 case '9' 
 
-#define add_nextc() _addc(sc, _nextc(sc->file, sc))
-#define nextc() _nextc(sc->file, sc)
-#define addc(c) _addc(sc, c)
-#define prevc() _prevc(c, sc->file, sc->str, sc->buflen)
-#define schars() _schars(c, sc->file, sc->str, sc->buflen)
-#define error() _error(c, sc)
-
-#define unex() do { error(); *state = Error; tok = tErr; } while (0)
-#define accept(tt) do { *state = Accept; tok = tt; } while (0)
-#define accept_pb(tt) do { prevc(); accept(tt); } while (0)
-
 static unsigned int lineno = 1;
 
 static inline int char2hex(int c)
@@ -51,7 +40,7 @@ FILE * open_json(jchar *filename)
 	}
 }
 
-jchar * _extendbuf(jchar *buf, unsigned int buflen)
+static jchar * _extendbuf(jchar *buf, unsigned int buflen)
 {
 	jchar *tmp = (jchar *)realloc(buf, (buflen + SCANBUF_SIZE));
 
@@ -65,7 +54,7 @@ jchar * _extendbuf(jchar *buf, unsigned int buflen)
 	return tmp;
 }
 
-int _addc(scanner_t *sc, int c)
+static int _addc(scanner_t *sc, int c)
 {
 	jchar *buf = sc->str;
 	unsigned int buflen = sc->buflen;
@@ -104,7 +93,7 @@ int _addc(scanner_t *sc, int c)
 	return c;
 }
 
-int _nextc(FILE *file, scanner_t *sc)
+static int _nextc(FILE *file, scanner_t *sc)
 {
 	unsigned int buflen = sc->buflen;
 	jchar *buf = sc->str;
@@ -116,18 +105,12 @@ int _nextc(FILE *file, scanner_t *sc)
 	return c;
 }
 
-int _prevc(int c, FILE *file, jchar *str, unsigned int len)
+static inline int _prevc(int c, FILE *file)
 {
-	if (str != NULL)
-	{	
-		// Shorten by one char
-		str[len-1] = '\0';
-	}
-
 	return ungetc(c, file);
 }
 
-int _error(int c, scanner_t *sc)
+static int _error(int c, scanner_t *sc)
 {
 	printf("Unexpected %c in stream at line %d (in state %s) (Had partial token %s)\n", 
 		c, lineno, state2str[sc->state], sc->str);
@@ -136,7 +119,7 @@ int _error(int c, scanner_t *sc)
 	return 1;
 }
 
-void _schars(int c, FILE *file, jchar *str, unsigned int len)
+static void _schars(int c, FILE *file, jchar *str, unsigned int len)
 {
 	// Skip spaces
 	while (isspace(c))
@@ -144,11 +127,25 @@ void _schars(int c, FILE *file, jchar *str, unsigned int len)
 		c = getc(file);
 	}
 	// Put back first nonspace
-	_prevc(c, file, str, len);
+	_prevc(c, file);
 }
 
 token_t scan_json(scanner_t *sc)
 {
+/* Function-specific macros */
+#define SCAN_NAME sc
+
+#define add_nextc() _addc(SCAN_NAME, _nextc(SCAN_NAME->file, SCAN_NAME))
+#define nextc() _nextc(SCAN_NAME->file, SCAN_NAME)
+#define addc(c) _addc(SCAN_NAME, c)
+#define prevc() _prevc(c, SCAN_NAME->file)
+#define schars() _schars(c, SCAN_NAME->file, SCAN_NAME->str, SCAN_NAME->buflen)
+#define error() _error(c, SCAN_NAME)
+
+#define unex() do { error(); *state = Error; tok = tErr; } while (0)
+#define accept(tt) do { *state = Accept; tok = tt; } while (0)
+#define accept_pb(tt) do { prevc(); accept(tt); } while (0)
+
 	token_t tok;
 	state_t *state = &(sc->state);
 	*state = Start;
@@ -233,7 +230,7 @@ token_t scan_json(scanner_t *sc)
 
 			case 'e':
 			case 'E':
-				*state = InExp;
+				*state = StartExp;
 				break;
 
 			case EOF:
@@ -263,30 +260,39 @@ token_t scan_json(scanner_t *sc)
 			return tok;
 
 		case StartNum:
-			c = add_nextc();
+			c = nextc();
 
 			switch (c)
 			{
 			case '.':
 				*state = InFrac;
+				tok = tDoble;
+
+				addc(c);
 				break;
 
 			default:
 				if (isdigit(c) || c == '-')
+				{
 					*state = InNum;
+					addc(c);
+					tok = tDoble;
+				}
 				else
-					unex();
+				{
+					accept_pb(tDoble);
+				}
 			}
-			tok = tDoble;
 			break; // StartNum
 
 		case InNum:
-			c = add_nextc();
+			c = nextc();
 
 			switch (c)
 			{
 			case '.':
 				*state = InFrac;
+				addc(c);
 				tok = tDoble;
 				break;
 
@@ -297,7 +303,7 @@ token_t scan_json(scanner_t *sc)
 			break; // InNum
 
 		case InFrac:
-			c = add_nextc();
+			c = nextc();
 
 			switch (c)
 			{
@@ -306,18 +312,46 @@ token_t scan_json(scanner_t *sc)
 				break;
 
 			default:
-				if ( ! isdigit(c))
+				if (isdigit(c))
+					addc(c);
+				else
 					accept_pb(tDoble);
 			}
 			break; //InFrac
 
+		case StartExp:
+			c = nextc();
+			if (isdigit(c))
+			{
+				addc(c);
+				*state = InExp;
+			}
+			else if (c == '-' || c == '+')
+			{
+				addc(c);
+				
+				// Check to see there is at least one digit
+				c = nextc();
+				if (isdigit(c))
+				{
+					addc(c);
+					*state = InExp;
+				}
+				else
+				{
+					unex();
+				}
+			}			
+
+			break; // StartExp
+
+
 		case InExp:
-			c = add_nextc();
+			c = nextc();
 			switch (c)
 			{
-			case '+':
-			case '-':
 			case_digit:	// Stay in this state
+				addc(c);
 				break;
 
 			case '.':
@@ -423,6 +457,7 @@ tostr:
 			c = nextc();
 			if (c == 'R' || c == 'r')
 			{
+				addc(c);
 				*state = InT2;
 			}
 			else
@@ -435,6 +470,7 @@ tostr:
 			c = nextc();
 			if (c == 'U' || c == 'u')
 			{
+				addc(c);
 				*state = InT3;
 			}
 			else
@@ -447,6 +483,7 @@ tostr:
 			c = nextc();
 			if (c == 'E' || c == 'e')
 			{
+				addc(c);
 				accept(tTrue);
 			}
 			else
@@ -459,6 +496,7 @@ tostr:
 			c = nextc();
 			if (c == 'A' || c == 'a')
 			{
+				addc(c);
 				*state = InF2;
 			}
 			else
@@ -471,6 +509,7 @@ tostr:
 			c = nextc();
 			if (c == 'L' || c == 'l')
 			{
+				addc(c);
 				*state = InF3;
 			}
 			else
@@ -483,6 +522,7 @@ tostr:
 			c = nextc();
 			if (c == 'S' || c == 's')
 			{
+				addc(c);
 				*state = InF4;
 			}
 			else
@@ -495,6 +535,7 @@ tostr:
 			c = nextc();
 			if (c == 'E' || c == 'e')
 			{
+				addc(c);
 				accept(tFalse);
 			}
 			else
@@ -507,6 +548,7 @@ tostr:
 			c = nextc();
 			if (c == 'U' || c == 'u')
 			{
+				addc(c);
 				*state = InN2;
 			}
 			else
@@ -519,6 +561,7 @@ tostr:
 			c = nextc();
 			if (c == 'L' || c == 'l')
 			{
+				addc(c);
 				*state = InN3;
 			}
 			else
@@ -531,6 +574,7 @@ tostr:
 			c = nextc();
 			if (c == 'L' || c == 'l')
 			{
+				addc(c);
 				accept(tNull);
 			}
 			else

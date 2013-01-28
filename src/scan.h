@@ -29,11 +29,31 @@ typedef enum {
 	tBegin,	  // 16
 } token_t;
 
+static const char tok2str[][8] = {
+	"LCurl",
+	"RCurl",
+	"Colon",
+	"Comma",
+	"LBrace",
+	"RBrace",
+	"DQuote",
+	"String",
+	"Doble",
+	"Exp",
+	"True",
+	"False",
+	"Null",
+	"Escape",
+	"End",
+	"Err",
+	"Begin",
+};
+
 typedef enum {
 	Start, Accept, Error,
 	InObjK, InObjV,
 	InArr, 
-	StartNum, InNum, InFrac, EndNum, InExp, 
+	StartNum, InNum, InFrac, EndNum, StartExp, InExp, 
 	InStr, InEscape, InHex,
 	InT1, InT2, InT3,
 	InF1, InF2, InF3, InF4,
@@ -44,7 +64,7 @@ static const char state2str[][9] = {
 	"Start", "Accept", "Error",
 	"InObjK", "InObjV",
 	"InArr",
-	"StartNum", "InNum", "InFrac", "EndNum", "InExp", 
+	"StartNum", "InNum", "InFrac", "EndNum", "StartExp", "InExp", 
 	"InStr", "InEscape", "InHex",
 	"InT1", "InT2", "InT3",
 	"InF1", "InF2", "InF3", "InF4",
