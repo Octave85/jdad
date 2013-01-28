@@ -33,12 +33,23 @@ typedef enum {
 	Start, Accept, Error,
 	InObjK, InObjV,
 	InArr, 
-	StartNum, InNum, InFrac, EndNum, InExp, InStr,
-	InEscape, InHex,
+	StartNum, InNum, InFrac, EndNum, InExp, 
+	InStr, InEscape, InHex,
 	InT1, InT2, InT3,
 	InF1, InF2, InF3, InF4,
 	InN1, InN2, InN3, 
 } state_t;
+
+static const char state2str[][9] = {
+	"Start", "Accept", "Error",
+	"InObjK", "InObjV",
+	"InArr",
+	"StartNum", "InNum", "InFrac", "EndNum", "InExp", 
+	"InStr", "InEscape", "InHex",
+	"InT1", "InT2", "InT3",
+	"InF1", "InF2", "InF3", "InF4",
+	"InN1", "InN2", "InN3",
+};
 
 typedef struct {
 	jchar *str;
@@ -47,6 +58,7 @@ typedef struct {
 	unsigned int errors;
 	FILE *file;
 } scanner_t;
+
 
 token_t scan_json(scanner_t *);
 FILE *open_json(jchar *);

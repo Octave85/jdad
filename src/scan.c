@@ -12,16 +12,29 @@ case '7': \
 case '8': \
 case '9' 
 
+#define add_nextc() _addc(sc, _nextc(sc->file, sc))
 #define nextc() _nextc(sc->file, sc)
+#define addc(c) _addc(sc, c)
 #define prevc() _prevc(c, sc->file, sc->str, sc->buflen)
 #define schars() _schars(c, sc->file, sc->str, sc->buflen)
 #define error() _error(c, sc)
 
-#define unex() error(); *state = Error; tok = tErr;
-#define accept(tt) *state = Accept; tok = tt;
-#define accept_pb(tt) prevc(); accept(tt);
+#define unex() do { error(); *state = Error; tok = tErr; } while (0)
+#define accept(tt) do { *state = Accept; tok = tt; } while (0)
+#define accept_pb(tt) do { prevc(); accept(tt); } while (0)
 
 static unsigned int lineno = 1;
+
+static inline int char2hex(int c)
+{
+	int cu = toupper(c);
+	if (cu >= 'A' && cu <= 'F')
+		return cu - '7'; // same as - 'A' + 10
+	else if (cu >= '0' && cu <= '9')
+		return cu - '0';
+
+	return -1;
+}
 
 FILE * open_json(jchar *filename)
 {
@@ -52,14 +65,11 @@ jchar * _extendbuf(jchar *buf, unsigned int buflen)
 	return tmp;
 }
 
-int _nextc(FILE *file, scanner_t *sc)
+int _addc(scanner_t *sc, int c)
 {
-	unsigned int buflen = sc->buflen;
 	jchar *buf = sc->str;
+	unsigned int buflen = sc->buflen;
 
-	int c = getc(file);
-
-	lineno += (c == '\n');
 
 	if (buf != NULL)
 	{
@@ -90,7 +100,19 @@ int _nextc(FILE *file, scanner_t *sc)
 
 		sc->buflen = buflen;
 	}
-	
+
+	return c;
+}
+
+int _nextc(FILE *file, scanner_t *sc)
+{
+	unsigned int buflen = sc->buflen;
+	jchar *buf = sc->str;
+
+	int c = getc(file);
+
+	lineno += (c == '\n');
+
 	return c;
 }
 
@@ -107,8 +129,8 @@ int _prevc(int c, FILE *file, jchar *str, unsigned int len)
 
 int _error(int c, scanner_t *sc)
 {
-	printf("Unexpected %c in stream at line %d (in state %d)"
-		" (Had partial token %s)\n", c, lineno, sc->state, sc->str);
+	printf("Unexpected %c in stream at line %d (in state %s) (Had partial token %s)\n", 
+		c, lineno, state2str[sc->state], sc->str);
 	sc->errors++;
 	
 	return 1;
@@ -140,328 +162,388 @@ token_t scan_json(scanner_t *sc)
 		
 		switch (*state)
 		{
-			case Start:
-				c = nextc();
+		case Start:
+			c = nextc();
 
-				switch (c)
-				{
-					
-					case '{':
-						accept(tLCurl);
-						break;
-
-					case '}':
-						accept(tRCurl);
-						break;
-
-					case ',':
-						accept(tComma);
-						break;
-
-					case '[':
-						accept(tLBrace);
-						break;
-
-					case ']':
-						accept(tRBrace);
-						break;
-
-					case '"':
-						tok = tString;
-						*state = InStr;
-						break;
-
-					case ':':
-						accept(tColon);
-						break;
-					
-					case 'T':
-					case 't':
-						*state = InT1;
-						tok = tTrue;
-						break;
-
-					case 'F':
-					case 'f':
-						*state = InF1;
-						tok = tFalse;
-						break;
-
-					case 'N':
-					case 'n':
-						*state = InN1;
-						tok = tNull;
-						break;
-
-					case '.':
-					case '-':
-					case_digit:
-						*state = StartNum;
-						prevc();
-						break;
-
-					case 'e':
-					case 'E':
-						*state = InExp;
-						sc->str[sc->buflen-1] = '\0';
-						break;
-
-					case EOF:
-						accept(tEnd);
-						break;
-
-					default:
-						if (isspace(c))
-						{
-							schars();
-						}
-						else
-						{
-							unex();
-						}
-				}
-
+			switch (c)
+			{
+				
+			case '{':
+				accept(tLCurl);
+				addc(c);
 				break;
-			case Accept:
-			case Error:
-				return tok;
 
-			case StartNum:
-				c = nextc();
+			case '}':
+				accept(tRCurl);
+				addc(c);
+				break;
 
-				switch (c)
-				{
-					case '-':
-					case_digit:
-						*state = InNum;
-						tok = tDoble;
-						break;
+			case ',':
+				accept(tComma);
+				addc(c);
+				break;
 
-					case '.':
-						*state = InFrac;
-						tok = tDoble;
-						break;
+			case '[':
+				accept(tLBrace);
+				addc(c);
+				break;
 
-					default:
-						unex();
-				}
-				break; // StartNum
+			case ']':
+				accept(tRBrace);
+				addc(c);
+				break;
 
-			case InNum:
-				c = nextc();
+			case '"':
+				tok = tString;
+				*state = InStr;
+				break;
 
-				switch (c)
-				{
-					case_digit:	// Stay in this state
-						break;
+			case ':':
+				accept(tColon);
+				addc(c);
+				break;
+			
+			case 'T':
+			case 't':
+				*state = InT1;
+				tok = tTrue;
+				addc(c);
+				break;
 
-					case '.':
-						*state = InFrac;
-						tok = tDoble;
-						break;
+			case 'F':
+			case 'f':
+				*state = InF1;
+				tok = tFalse;
+				addc(c);
+				break;
 
-					default:
-						accept_pb(tDoble);
-				}
-				break; // InNum
+			case 'N':
+			case 'n':
+				*state = InN1;
+				tok = tNull;
+				addc(c);
+				break;
 
-			case InFrac:
-				c = nextc();
-				switch (c)
-				{
-					case_digit:	// Stay in this state
-						break;
+			case '.':
+			case '-':
+			// digit case handled after
+				addc(c);
+				*state = StartNum;
+				break;
 
-					case '.':
-						unex();
-						break;
+			case 'e':
+			case 'E':
+				*state = InExp;
+				break;
 
-					default:
-						accept_pb(tDoble);
-				}
-				break; //InFrac
-
-			case InExp:
-				c = nextc();
-				switch (c)
-				{
-					case '+':
-					case '-':
-					case_digit:	// Stay in this state
-						break;
-
-					case '.':
-						unex();
-						break;
-
-					default:
-						accept_pb(tExp);
-				}
-				break; // InExp
-
-			case InStr:
-				c = nextc();
-				switch (c)
-				{
-					case '\\':
-						*state = InEscape;
-						break;
-
-					case '"':
-						accept(tString);
-						break;
-
-					case EOF:
-						unex();
-				}
-				break; // InStr
-
-			case InEscape:
-				c = nextc();
-				switch (c)
-				{
-					case '"':
-					case '\\':
-					case '/':
-					case 'b':
-					case 'f':
-					case 'n':
-					case 'r':
-					case 't':
-					case 'u':
-						*state = InStr;
-						break;
-
-					default:
-						unex();
-				}
-				break; // InEscape
-
-			case InT1:
-				c = nextc();
-				if (c == 'R' || c == 'r')
-				{
-					*state = InT2;
-				}
-				else
-				{
-					unex();
-				}
-				break; // InT1
-
-			case InT2:
-				c = nextc();
-				if (c == 'U' || c == 'u')
-				{
-					*state = InT3;
-				}
-				else
-				{
-					unex();
-				}
-				break; // InT2
-
-			case InT3:	
-				c = nextc();
-				if (c == 'E' || c == 'e')
-				{
-					accept(tTrue);
-				}
-				else
-				{
-					unex();
-				}
-				break; // InT3
-
-			case InF1:
-				c = nextc();
-				if (c == 'A' || c == 'a')
-				{
-					*state = InF2;
-				}
-				else
-				{
-					unex();
-				}
-				break; // InF1
-
-			case InF2:
-				c = nextc();
-				if (c == 'L' || c == 'l')
-				{
-					*state = InF3;
-				}
-				else
-				{
-					unex();
-				}
-				break; // InF2
-
-			case InF3:	
-				c = nextc();
-				if (c == 'S' || c == 's')
-				{
-					*state = InF4;
-				}
-				else
-				{
-					unex();
-				}
-				break; // InF3
-
-			case InF4:
-				c = nextc();
-				if (c == 'E' || c == 'e')
-				{
-					accept(tFalse);
-				}
-				else
-				{
-					unex();
-				}
-				break; // InF4
-
-			case InN1:
-				c = nextc();
-				if (c == 'U' || c == 'u')
-				{
-					*state = InN2;
-				}
-				else
-				{
-					unex();
-				}
-				break; // InN1
-
-			case InN2:
-				c = nextc();
-				if (c == 'L' || c == 'l')
-				{
-					*state = InN3;
-				}
-				else
-				{
-					unex();
-				}
-				break; // InN2
-
-			case InN3:	
-				c = nextc();
-				if (c == 'L' || c == 'l')
-				{
-					accept(tNull);
-				}
-				else
-				{
-					unex();
-				}
-				break; // InN3;
+			case EOF:
+				accept(tEnd);
+				break;
 
 			default:
-				printf("Internal error: unexpected state %d\n", *state);
-				return tErr;
+				if (isspace(c))
+				{
+					schars();
+				}
+				else if (isdigit(c))
+				{
+					addc(c);
+					*state = StartNum;
+				}
+				else
+				{
+					unex();
+				}
+			}
 
+			break;
 		
+		case Accept:
+		case Error:
+			return tok;
+
+		case StartNum:
+			c = add_nextc();
+
+			switch (c)
+			{
+			case '.':
+				*state = InFrac;
+				break;
+
+			default:
+				if (isdigit(c) || c == '-')
+					*state = InNum;
+				else
+					unex();
+			}
+			tok = tDoble;
+			break; // StartNum
+
+		case InNum:
+			c = add_nextc();
+
+			switch (c)
+			{
+			case '.':
+				*state = InFrac;
+				tok = tDoble;
+				break;
+
+			default:
+				if ( ! isdigit(c))
+					accept_pb(tDoble);
+			}
+			break; // InNum
+
+		case InFrac:
+			c = add_nextc();
+
+			switch (c)
+			{
+			case '.':
+				unex();
+				break;
+
+			default:
+				if ( ! isdigit(c))
+					accept_pb(tDoble);
+			}
+			break; //InFrac
+
+		case InExp:
+			c = add_nextc();
+			switch (c)
+			{
+			case '+':
+			case '-':
+			case_digit:	// Stay in this state
+				break;
+
+			case '.':
+				unex();
+				break;
+
+			default:
+				accept_pb(tExp);
+			}
+			break; // InExp
+
+		case InStr:
+			c = nextc();
+			switch (c)
+			{
+			case '\\':
+				*state = InEscape;
+				break;
+
+			case '"':
+				accept(tString);
+				break;
+
+			case EOF:
+				unex();
+
+			default:
+				addc(c);
+			}
+			break; // InStr
+
+		case InEscape:
+			c = nextc();
+			switch (c)
+			{
+			case '"':
+				addc('"');
+				goto tostr;
+			case '\\':
+				addc('\\');
+				goto tostr;
+			case '/':
+				addc('/');
+				goto tostr;
+			case 'b':
+				addc('\b');
+				goto tostr;
+			case 'f':
+				addc('\f');
+				goto tostr;
+			case 'n':
+				addc('\n');
+				goto tostr;
+			case 'r':
+				addc('\r');
+				goto tostr;
+			case 't':
+				addc('\t');
+				goto tostr;
+			case 'u':
+				*state = InHex;
+				break;
+			default:
+				unex();
+			}
+			break;
+tostr:			
+			*state = InStr;
+			break; // InEscape
+
+		case InHex:
+			c = nextc();
+			int hex;
+			hex = 0;
+			
+			if (isxdigit(c))
+				hex |= (char2hex(c) << 12);
+			else
+				unex();
+			c = nextc();
+			if (isxdigit(c))
+				hex |= (char2hex(c) << 8);
+			else
+				unex();
+			c = nextc();
+			if (isxdigit(c))
+				hex |= (char2hex(c) << 4);
+			else
+				unex();
+			c = nextc();
+			if (isxdigit(c))
+				hex |= char2hex(c);
+			else
+				unex();
+
+			addc(hex);
+			
+			*state = InStr;
+			
+			break; // InHex
+
+		case InT1:
+			c = nextc();
+			if (c == 'R' || c == 'r')
+			{
+				*state = InT2;
+			}
+			else
+			{
+				unex();
+			}
+			break; // InT1
+
+		case InT2:
+			c = nextc();
+			if (c == 'U' || c == 'u')
+			{
+				*state = InT3;
+			}
+			else
+			{
+				unex();
+			}
+			break; // InT2
+
+		case InT3:	
+			c = nextc();
+			if (c == 'E' || c == 'e')
+			{
+				accept(tTrue);
+			}
+			else
+			{
+				unex();
+			}
+			break; // InT3
+
+		case InF1:
+			c = nextc();
+			if (c == 'A' || c == 'a')
+			{
+				*state = InF2;
+			}
+			else
+			{
+				unex();
+			}
+			break; // InF1
+
+		case InF2:
+			c = nextc();
+			if (c == 'L' || c == 'l')
+			{
+				*state = InF3;
+			}
+			else
+			{
+				unex();
+			}
+			break; // InF2
+
+		case InF3:	
+			c = nextc();
+			if (c == 'S' || c == 's')
+			{
+				*state = InF4;
+			}
+			else
+			{
+				unex();
+			}
+			break; // InF3
+
+		case InF4:
+			c = nextc();
+			if (c == 'E' || c == 'e')
+			{
+				accept(tFalse);
+			}
+			else
+			{
+				unex();
+			}
+			break; // InF4
+
+		case InN1:
+			c = nextc();
+			if (c == 'U' || c == 'u')
+			{
+				*state = InN2;
+			}
+			else
+			{
+				unex();
+			}
+			break; // InN1
+
+		case InN2:
+			c = nextc();
+			if (c == 'L' || c == 'l')
+			{
+				*state = InN3;
+			}
+			else
+			{
+				unex();
+			}
+			break; // InN2
+
+		case InN3:	
+			c = nextc();
+			if (c == 'L' || c == 'l')
+			{
+				accept(tNull);
+			}
+			else
+			{
+				unex();
+			}
+			break; // InN3;
+
+		default:
+			printf("Internal error: unexpected state %d\n", *state);
+			return tErr;
+
+	
 		// End of state switch
 		}
 	
