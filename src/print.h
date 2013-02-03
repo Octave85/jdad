@@ -7,6 +7,8 @@
 #define PRINT_S pr->ostream
 #define PR_NAME pr
 
+#define BUFFER_START 1024
+
 #define del_printer(pr) c_free(pr)
 #define close_ostream(pr) fclose(pr->ostream)
 

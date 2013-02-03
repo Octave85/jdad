@@ -6,17 +6,7 @@ printer_t * new_printer(FILE *ostream, printmode_t mode)
 
 	if (newprinter)
 	{
-		switch (mode)
-		{
-		case Compact:
-			newprinter->donl = newprinter->doin = 0;
-			break;
-
-		/* case Pretty: */
-		default:
-			newprinter->donl = newprinter->doin = 1;
-			break;
-		}
+		newprinter->donl = newprinter->doin = (mode == Pretty);
 		
 		newprinter->level = 0;
 		newprinter->ostream = (ostream != NULL) ? ostream : stdout;
@@ -44,14 +34,20 @@ void in(printer_t *pr)
 	while (lvl--) print("  ");
 }
 
+#define SPACE " "
+
 #elif defined(COMPACT_PRINT)
 
 #define nl(PR_NAME)
 #define in(PR_NAME)
 
+#define SPACE ""
+
 #else /* Define default functions that check the condition each time */
 
 #define nl(PR_NAME) if (PR_NAME->donl) princ(PR_NAME, '\n')
+#define SPACE ((PR_NAME->doin) ? " " : "")
+
 void in(printer_t *pr)
 {
 	if (PR_NAME->doin)
@@ -66,13 +62,14 @@ void print_scalar(printer_t *pr, thing_t *sc)
 {
 	switch (sa(sc, stype))
 	{
+	case Integer:
+		print("%d", sa(sc, number).integer);
+		goto print_exp;
+		break;
 	case Doble:
-		print("%.3f", sa(sc, number).doble);
-		if (sa(sc, number).exp > 0)
-		{
-			princ(pr, 'e');
-			print("%d", sa(sc, number).exp);
-		}
+	case BigNum:
+		print("%s", sa(sc, stringval));
+		goto print_exp;
 		break;
 	case String:
 		princ(pr, '"');
@@ -88,6 +85,15 @@ void print_scalar(printer_t *pr, thing_t *sc)
 	default:
 		print("Unrecognized scalar type to print\n");
 	}
+
+	return;
+
+print_exp:
+	if (sa(sc, number).exponent > 0)
+	{
+		princ(pr, 'e');
+		print("%d", sa(sc, number).exponent);
+	}
 }
 
 void print_obj(printer_t *pr, thing_t *obj)
@@ -100,7 +106,7 @@ void print_obj(printer_t *pr, thing_t *obj)
 	incin(pr);
 	nl(pr);
 
-#define pair_print(pair) do { print("\"%s\": ", k->key); \
+#define pair_print(pair) do { print("\"%s\":%s", k->key, SPACE); \
 	print_thing(pr, k->val); } while (0)
 #define pair_print_c(pair) do { pair_print(pair); princ(pr, ','); } while (0)
 
@@ -170,6 +176,7 @@ void print_arr(printer_t *pr, thing_t *arr)
 
 	print("]");
 }
+
 
 void print_thing(printer_t *pr, thing_t *thing)
 {
