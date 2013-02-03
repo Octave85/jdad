@@ -276,11 +276,10 @@ token_t scan_json(scanner_t *sc)
 				{
 					*state = InNum;
 					addc(c);
-					tok = tDoble;
 				}
 				else
 				{
-					accept_pb(tDoble);
+					accept_pb(tInteger);
 				}
 			}
 			break; // StartNum
@@ -297,8 +296,10 @@ token_t scan_json(scanner_t *sc)
 				break;
 
 			default:
-				if ( ! isdigit(c))
-					accept_pb(tDoble);
+				if (isdigit(c))
+					addc(c);
+				else
+					accept_pb(tInteger);
 			}
 			break; // InNum
 

@@ -2,6 +2,10 @@
 #define PARSE_H
 
 #include "scan.h"
+#include <limits.h>
+#include <float.h>
+#include <errno.h>
+#include <math.h>
 #include "print.h"
 
 #define copy_sansquotes(str, len) new_copy(str, len * sizeof(jchar))
@@ -22,12 +26,6 @@ typedef struct {
 	thing_t *data;
 } parser_t;
 
-struct node_t_st {
-	thing_t *thing;
-	struct node_t_st *next;
-}; 
-
-typedef struct node_t_st node_t;
 
 #ifdef __cplusplus
 extern "C" {

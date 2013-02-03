@@ -1,6 +1,9 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#include <limits.h>
+#include <float.h>
+#include <errno.h>
 #include <string.h>
 #include "global.h"
 
@@ -12,18 +15,12 @@
 #define oa(t, p) t->p
 #define aa(t, p) t->p
 #define sa(t, p) t->p
-#define la(l, f, t) *(l).*((t)data).f
 
-#define ATOM_UNION jchar *string; \
-	struct { 	\
-		double 	doble;	\
-		int		exp;	\
-	} number;	\
-	truthval_t truthval;
+#define ATOM_UNION 
 
 typedef enum { Object, Array, Scalar   } type_t;	// Thing type
 
-typedef enum { String, Doble, Truthval } stype_t;	// Scalar type
+typedef enum { String, Doble, Integer, BigNum, Truthval } stype_t;	// Scalar type
 
 struct llm_t_st {	// General linked list member/data container.
 	void *data;
@@ -32,18 +29,27 @@ struct llm_t_st {	// General linked list member/data container.
 typedef struct llm_t_st llm_t;
 
 
-union atom_t_st {
-	ATOM_UNION;
-};
-typedef union atom_t_st atom_t;
-
+/*  The main data type, thing_t, represents any JSON value.
+**  It's implemented as an anonymous union of anonymous structs 
+**  which lets us refer to its fields directly. The fields used are
+**  based on its type. Type is the only member outside the outermost union.
+*/
 struct thing_t_st {
 	union {
 		
 		struct {	/* Scalar */
 			union {
-				ATOM_UNION;
+				jchar *string;
+				struct {
+					union {
+						double 	doble;
+						long    integer;
+					};
+					long exponent;
+				} number;
+				truthval_t truthval;			
 			};
+			
 			jchar *stringval;
 			stype_t stype;
 			unsigned int len;
@@ -81,9 +87,11 @@ extern "C" {
 
 llm_t *new_llm(void *, llm_t *);
 
-thing_t * JDAD_DLL new_scal(jchar *, stype_t);
+thing_t * JDAD_DLL new_scal(stype_t);
 thing_t * JDAD_DLL new_string(jchar *);
 thing_t * JDAD_DLL new_doble(double, int);
+thing_t * JDAD_DLL new_integer(long, int);
+thing_t * JDAD_DLL new_bignum(jchar *);
 thing_t * JDAD_DLL new_truthval(truthval_t);
 void JDAD_DLL del_scal(thing_t *);
 

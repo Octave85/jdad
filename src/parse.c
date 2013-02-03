@@ -12,8 +12,8 @@
 
 void error(parser_t *p)
 {
-	printf("Unexpected token %s (%d), aborting\n",
-		p->scan->str, p->la);
+	printf("Unexpected %s %s, aborting\n",
+		tok2str[p->la], p->scan->str);
 
 	exit(-1);
 }
@@ -39,22 +39,22 @@ jchar *new_copy(jchar *str, int len)
 
 thing_t * truthval(parser_t *p)
 {
-	thing_t *newtr;
+	thing_t *newtr = NULL;
 	switch (p->la)
 	{
 		case tTrue:
 			match(tTrue);
-			newtr = new_scal(_s("True"), Truthval);
+			newtr = new_scal(Truthval);
 			sa(newtr, truthval) = True;
 			break;
 		case tFalse:
 			match(tFalse);
-			newtr = new_scal(_s("False"), Truthval);
+			newtr = new_scal(Truthval);
 			sa(newtr, truthval) = False;
 			break;
 		case tNull:
 			match(tNull);
-			newtr = new_scal(_s("Null"), Truthval);
+			newtr = new_scal(Truthval);
 			sa(newtr, truthval) = Null;
 			break;
 		default:
@@ -73,10 +73,10 @@ thing_t * string(parser_t *p)
 		// Get rid of quotes
 		jchar *copy = copy_sansquotes(p->scan->str, p->scan->buflen);
 
-		thing_t *newstr = new_scal(copy, String);
+		thing_t *newstr = new_scal(String);
 
 		sa(newstr, string) = copy;
-		sa(newstr, len) = p->scan->buflen ;
+		sa(newstr, len) = p->scan->buflen;
 
 		/*printf("\nHex contents(2): ");
 		int i;
@@ -88,33 +88,60 @@ thing_t * string(parser_t *p)
 
 		match(tString);
 
-		//node_t *strnode = new_node(0, Scalar, newstr);
-
 		return newstr;
 	}
 
 	error(p);
 }
 
-thing_t * doble(parser_t *p)
+long get_exponent(parser_t *p)
 {
-	jchar *copy = new_copy(p->scan->str, 0);
-
-	thing_t *newdob = new_scal(copy, Doble);
-	sa(newdob, number).doble = jstrtod(copy, NULL);
-	match(tDoble);
-
+	long exponent;
 	if (p->la == tExp)
 	{
-		sa(newdob, number).exp = jstrtol(p->scan->str, NULL, 0);
+		exponent = jstrtol(p->scan->str, NULL, 0);
 		match(tExp);
+		return exponent;
 	}
 	else
 	{
-		sa(newdob, number).exp = 0;
+		return 0;
+	}
+}
+
+thing_t * integer(parser_t *p)
+{
+	thing_t *newint = new_scal(Integer);
+
+	jchar *copy = new_copy(p->scan->str, 0);
+
+	sa(newint, number).integer = jstrtol(p->scan->str, NULL, 0);
+	match(tInteger);
+
+	if ((sa(newint, number).integer >= LONG_MAX 
+		|| sa(newint, number).integer <= LONG_MIN) 
+		&& errno == ERANGE)
+	{
+		sa(newint, stype) = BigNum;
+		sa(newint, stringval) = copy;
 	}
 
-	//node_t *dobnode = new_node(0, Scalar, newdob);
+	sa(newint, number).exponent = get_exponent(p);
+
+	return newint;
+}
+
+thing_t * doble(parser_t *p)
+{
+	thing_t *newdob = new_scal(Doble);
+
+	jchar *copy = new_copy(p->scan->str, 0);
+
+	match(tDoble);
+
+	sa(newdob, stringval) = copy;
+
+	sa(newdob, number).exponent = get_exponent(p);
 
 	return newdob;
 }
@@ -126,10 +153,6 @@ thing_t * object(parser_t *p)
 
 	while (p->la != tRCurl)
 	{		
-		/* "Quick and dirty" match of string to avoid wasting
-		** resources on making a thing_t * = string(p) on every
-		** key. We just want the string.
-		*/
 		if (p->la == tString)
 		{
 			key = copy_sansquotes(p->scan->str, p->scan->buflen);
@@ -150,10 +173,10 @@ thing_t * object(parser_t *p)
 			break;
 		else
 			error(p);
+
 	}
 
 	match(tRCurl);
-
 
 	return newobj;
 }
@@ -190,37 +213,42 @@ thing_t * thing(parser_t *p)
 
 	switch (p->la)
 	{
-		case tLCurl:
-			match(tLCurl);
-			return object(p);
-			break;
+	case tLCurl:
+		match(tLCurl);
+		return object(p);
+		break;
 
-		case tLBrace:
-			match(tLBrace);
-			return array(p);
-			break;
+	case tLBrace:
+		match(tLBrace);
+		return array(p);
+		break;
 
-		case tDoble:	// All primitives resolve to themselves
-			return doble(p);
-			break;
+	case tDoble:	// All primitives resolve to themselves
+		return doble(p);
+		break;
 
-		case tString:
-			return string(p);
-			break;
+	case tInteger:
+		return integer(p);
+		break;
 
-		case tNull:
-		case tTrue:
-		case tFalse:
-			return truthval(p);
+	case tString:
+		return string(p);
+		break;
 
-		case tErr:
-			error(p);
+	case tNull:
+	case tTrue:
+	case tFalse:
+		return truthval(p);
 
-		case tEnd:
-			return NULL;
+	case tErr:
+		error(p);
 
-		default:
-			error(p);
+	case tEnd:
+		fprintf(stderr, "Got End from beggining parse\n");
+		return NULL;
+
+	default:
+		error(p);
 
 	}
 
@@ -243,7 +271,7 @@ parser_t *new_parser(jchar *filename)
 		newp->scan = (scanner_t *)c_malloc(sizeof(scanner_t));
 		if (newp->scan)
 			newp->scan->str = 
-				(jchar *)c_calloc(SCANBUF_SIZE, sizeof(jchar));
+			(jchar *)c_calloc(SCANBUF_SIZE, sizeof(jchar));
 
 		newp->scan->file = open_json(filename);
 

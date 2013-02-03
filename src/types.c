@@ -45,19 +45,18 @@ llm_t * addback(llm_t *last, void *add)
 	return newllm;
 }
 
-thing_t * new_scal(jchar *stringval, stype_t type)
+thing_t * new_scal(stype_t type)
 {
 	thing_t *newscal = (thing_t *)c_malloc(sizeof(thing_t));
 	newscal->type = Scalar;
 	sa(newscal, stype) = type;
-	sa(newscal, stringval) = stringval;
 
 	return newscal;
 }
 
 thing_t * new_string(jchar *stringval)
 {
-	thing_t *newstr = new_scal(stringval, String);
+	thing_t *newstr = new_scal(String);
 	sa(newstr, string) = stringval;
 
 	return newstr;
@@ -65,31 +64,40 @@ thing_t * new_string(jchar *stringval)
 
 thing_t * new_doble(double doble, int exponent)
 {
-	jchar *stringval = (jchar *)c_malloc(64);
 	thing_t *newdob = NULL;
 
-	if (stringval != NULL)
-	{
-		snprintf(stringval, 64, "%.3fe%d", doble, exponent);
-		newdob = new_scal(stringval, Doble);
-		sa(newdob, number.doble) = doble;
-		sa(newdob, number.exp  ) = exponent;
-	}
+	newdob = new_scal(Doble);
+	sa(newdob, stringval) = jstrtod(doble, NULL);
+	sa(newdob, number.exponent) = exponent;
 
 	return newdob;
 }
 
+thing_t * new_integer(long integer, int exponent)
+{
+	thing_t *newint = NULL;
+
+	newint = new_scal(Integer);
+	sa(newint, number.integer ) = integer;
+	sa(newint, number.exponent) = exponent;
+
+	return newint;
+}
+
+thing_t * new_bignum(jchar *stringrep)
+{
+	thing_t *newbn = new_scal(BigNum);
+	sa(newbn, string) = stringrep; 
+
+	return newbn;
+}
+
 thing_t * new_truthval(truthval_t tv)
 {
-	jchar *stringval = (jchar *)c_malloc(6);
 	thing_t *newtv = NULL;
 
-	if (stringval != NULL)
-	{
-		snprintf(stringval, 6, "%s", tv2str[tv]);
-		newtv = new_scal(stringval, Truthval);
-		sa(newtv, truthval) = tv;
-	}
+	newtv = new_scal(Truthval);
+	sa(newtv, truthval) = tv;
 
 	return newtv;
 }
@@ -104,21 +112,19 @@ inline void del_scal(thing_t *scal)
 	//	c_free(sa(scal, string));
 	//}
 
-	//c_free(sa(scal, stringval));
-
 	c_free(scal);
 }
 
 thing_t * new_arr(unsigned int maxlength)
 {
-	thing_t *newarr = 
-		(thing_t *)c_malloc(sizeof(thing_t));
+	thing_t *newarr;
+	newarr = (thing_t *)c_malloc(sizeof(*newarr));
 	
-	aa(newarr, type)      = Array;
-	aa(newarr, alen)      = 0;
-	aa(newarr, maxlength) = maxlength;
+	aa(newarr, type)     	= Array;
+	aa(newarr, alen)     	= 0;
+	aa(newarr, maxlength)	= maxlength;
 	aa(newarr, c_first)	= NULL;
-	aa(newarr, c_last) = NULL;
+	aa(newarr, c_last) 	= NULL;
 
 	return newarr;
 }
@@ -147,17 +153,17 @@ thing_t * getarrval(thing_t *arr, unsigned int ind)
 
 void del_arr(thing_t *arr)
 {
-	llm_t *lm = aa(arr, c_first), *nx;
-	thing_t *da;
+	llm_t *lm = aa(arr, c_first), *next;
+	thing_t *del;
 
 	while (lm != NULL)
 	{
-		da = (thing_t *)lm->data;
-		del_thing(da);
+		del = (thing_t *)lm->data;
+		del_thing(del);
 
-		nx = lm->next;
+		next = lm->next;
 		c_free(lm);
-		lm = nx;
+		lm = next;
 	}
 
 	c_free(arr);
@@ -166,15 +172,15 @@ void del_arr(thing_t *arr)
 
 thing_t * new_obj(unsigned int length)
 {
-	thing_t *newobj = 
-		(thing_t *)c_malloc(sizeof(thing_t));
+	thing_t *newobj; 
+	newobj = (thing_t *)c_malloc(sizeof(*newobj));
 
 	if (newobj)
 	{
 		oa(newobj, type) 	= Object;
 		oa(newobj, olen)	= 0;	// Current number of k/v pairs
-		oa(newobj, key_first) = NULL;
-		oa(newobj, key_last) = NULL;
+		oa(newobj, key_first) 	= NULL;
+		oa(newobj, key_last) 	= NULL;
 	} 
 
 	return newobj;
@@ -185,9 +191,7 @@ pair_t * addkv(thing_t *object, pair_t *pair)
 	oa(object, key_last) = addback(oa(object, key_last), pair);
 	
 	if (oa(object, key_first) == NULL)
-	{
 		oa(object, key_first) = oa(object, key_last);
-	}
 
 	oa(object, olen)++;
 
@@ -202,6 +206,7 @@ pair_t * getobjval(thing_t *obj, jchar *key)
 
 	while (key_list != NULL)
 	{
+		/* Possible hash lookup here */
 		if ( ! strncmp(key, k->key, jstrlen(key)))
 			break;
 
@@ -214,7 +219,7 @@ pair_t * getobjval(thing_t *obj, jchar *key)
 
 void del_obj(thing_t *obj)
 {
-	llm_t *lm = oa(obj, key_first), *nx;
+	llm_t *lm = oa(obj, key_first), *next;
 	
 	while (lm != NULL)
 	{
@@ -222,10 +227,10 @@ void del_obj(thing_t *obj)
 		del_thing(pa->val);
 		c_free(pa);
 
-		nx = lm->next;
+		next = lm->next;
 		c_free(lm);
 		
-		lm = nx;
+		lm = next;
 	}
 
 	c_free(obj);

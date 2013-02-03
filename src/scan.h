@@ -19,14 +19,15 @@ typedef enum {
 	tDQuote,  // 6
 	tString,  // 7
 	tDoble,   // 8
-	tExp,	  // 9
-	tTrue,    // 10
-	tFalse,   // 11
-	tNull,    // 12
-	tEscape,  // 13
-	tEnd,     // 14
-	tErr,	  // 15
-	tBegin,	  // 16
+	tInteger, // 9
+	tExp,	  // 10
+	tTrue,    // 11
+	tFalse,   // 12
+	tNull,    // 13
+	tEscape,  // 14
+	tEnd,     // 15
+	tErr,	  // 16
+	tBegin,	  // 17
 } token_t;
 
 static const char tok2str[][8] = {
@@ -39,6 +40,7 @@ static const char tok2str[][8] = {
 	"DQuote",
 	"String",
 	"Doble",
+	"Integer",
 	"Exp",
 	"True",
 	"False",
