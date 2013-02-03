@@ -40,9 +40,6 @@ static const char tv2str[][6] = {
 };
 
 
-#define TRUE 1
-#define FALSE 0
-
 #define SENTINEL NULL
 
 typedef enum {
@@ -56,16 +53,20 @@ typedef enum {
 extern "C" {
 #endif // Prevent name-mangling
 
-void JDAD_DLL *c_malloc(size_t);
-void JDAD_DLL *c_calloc(size_t, size_t);
-void JDAD_DLL c_free(void *);
+void *c_malloc(size_t);
+void *c_calloc(size_t, size_t);
+void c_free(void *);
 
-unsigned int jstrlen(jchar *);
 double jstrtod(jchar *, jchar **);
 long jstrtol(jchar *, jchar **, unsigned int);
 
-void bputc(int);
-void bflush(void);
+#define c_malloc(sz) malloc(sz)
+#define c_calloc(sz1, sz2) calloc(sz1, sz2)
+#define c_free(bl) free(bl)
+#define jstrtod(str, rest) strtod(str, rest)
+#define jstrtol(str, rest, base) strtol(str, rest, base)
+
+unsigned int jstrlen(jchar *);
 
 #ifdef __cplusplus
 }
