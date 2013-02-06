@@ -6,12 +6,15 @@
 #include <stdio.h>
 #include <string.h>
 
+#if defined(_WIN32) || defined(_WIN64)
 #ifdef BUILDING_JDAD_DLL
 #	define JDAD_DLL  __declspec(dllexport)
 #else
 #	define JDAD_DLL  __declspec(dllimport) 
 #endif
-
+#else
+#	define JDAD_DLL
+#endif
 
 
 #define array_length(arr) sizeof(arr)/sizeof(*arr)
