@@ -1,5 +1,5 @@
 @echo off
 
-g++ -c src\*.c -DBUILDING_JDAD_DLL
-g++ -shared -o jdad.dll *.o
+gcc -c src\*.c -DBUILDING_JDAD_DLL -std=c99
+gcc -shared -o jdad.dll *.o
 del *.o
