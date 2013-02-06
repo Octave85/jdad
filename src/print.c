@@ -17,8 +17,8 @@ printer_t * new_printer(FILE *ostream, printmode_t mode)
 
 #define princ(PR_NAME, c) fputc(c, PR_NAME->ostream)
 #define print(...) fprintf(PR_NAME->ostream, __VA_ARGS__)
-#define incin(PR_NAME) (PR_NAME->level++)
-#define decin(PR_NAME) (PR_NAME->level--)
+#define inc_in(PR_NAME) (PR_NAME->level++)
+#define dec_in(PR_NAME) (PR_NAME->level--)
 
 /* PRETTY_PRINT and COMPACT_PRINT override programmatic
 ** mode selection to speed things up. Allows one to compile
@@ -58,6 +58,8 @@ void in(printer_t *pr)
 }
 #endif
 
+
+
 void print_scalar(printer_t *pr, thing_t *sc)
 {
 	switch (sa(sc, stype))
@@ -66,11 +68,14 @@ void print_scalar(printer_t *pr, thing_t *sc)
 		print("%d", sa(sc, number).integer);
 		goto print_exp;
 		break;
+
 	case Doble:
-	case BigNum:
+	case BigInt:
+	case BigDob:
 		print("%s", sa(sc, stringval));
 		goto print_exp;
 		break;
+
 	case String:
 		princ(pr, '"');
 		fwrite(sa(sc, string), 
@@ -79,9 +84,11 @@ void print_scalar(printer_t *pr, thing_t *sc)
 			   pr->ostream);
 		princ(pr, '"');
 		break;
+
 	case Truthval:
 		print(tv2str[sa(sc, truthval)]);
 		break;
+
 	default:
 		print("Unrecognized scalar type to print\n");
 	}
@@ -98,38 +105,39 @@ print_exp:
 
 void print_obj(printer_t *pr, thing_t *obj)
 {
+#define pair_print(pair) do { print("\"%s\":%s", k->key, SPACE); \
+	print_thing(pr, k->val); } while (0)
+#define pair_print_c(pair) do { pair_print(pair); princ(pr, ','); } while (0)
+
 	llm_t *key_list = oa(obj, key_first);
 	pair_t *k;
 
 	print("{");
 	
-	incin(pr);
+	inc_in(pr);
 	nl(pr);
-
-#define pair_print(pair) do { print("\"%s\":%s", k->key, SPACE); \
-	print_thing(pr, k->val); } while (0)
-#define pair_print_c(pair) do { pair_print(pair); princ(pr, ','); } while (0)
 
 	while (key_list && (key_list->next != NULL))
 	{
-		in(pr);
 		k = (pair_t *)key_list->data;
 
+		/* Print every element with comma */
+		in(pr);
 		pair_print_c(k);
+		nl(pr);
 
 		key_list = key_list->next;
-		nl(pr);
 	}
 	
-	in(pr);
-	
 	k = (pair_t *)key_list->data;
-	pair_print(k);
-	
-	nl(pr);
 
-	decin(pr);
+	/* Print the last element, sans comma. */
 	in(pr);
+	pair_print(k);
+	nl(pr);
+	dec_in(pr);
+	in(pr);
+
 	print("}");
 
 #undef pair_print_c
@@ -139,42 +147,39 @@ void print_obj(printer_t *pr, thing_t *obj)
 
 void print_arr(printer_t *pr, thing_t *arr)
 {
+#define el_print(lm) do { print_thing(pr, (thing_t *)lm->data); } while(0)
+#define el_print_c(lm) do { el_print(lm); princ(pr, ','); } while(0)	
+
 	print("[");
-	incin(pr);
+	inc_in(pr);
 	nl(pr);
 
 	llm_t *cur = aa(arr, c_first);
 
-#define el_print(lm) do { print_thing(pr, (thing_t *)lm->data); } while(0)
-#define el_print_c(lm) do { el_print(lm); princ(pr, ','); } while(0)
 
 	if (cur)
 	{
 		while (cur && (cur->next != NULL))
 		{
+			/* Print each element with comma */
 			in(pr);
-
 			el_print_c(cur);
-
-			cur = cur->next;
-
 			nl(pr);
+			cur = cur->next;
 		}
-		
+		/* Print last element, sans comma. */
 		in(pr);
-		
 		el_print(cur);
-		
 		nl(pr);
 	}
 	
-	decin(pr);
+	dec_in(pr);
 	in(pr);
+
+	print("]");
 
 #undef el_print_c
 #undef el_print
-
-	print("]");
 }
 
 
