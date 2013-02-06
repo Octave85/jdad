@@ -63,31 +63,12 @@ static int _addc(scanner_t *sc, int c)
 	if (buf != NULL)
 	{
 		if ((buflen + 1) % SCANBUF_SIZE == 0)
-		{
 			sc->str = _extendbuf(buf, buflen);
-			
-			//fprintf(stderr, "Extended at %d\n", buflen);
-		}
 
 		// Add character and new null byte
 		buf[buflen] = c;
-		
-		/*if (buflen < 129 && buflen > 125)
-		{	
-			fprintf(stderr, "set buf[%d] to %d\n", buflen, c);
-			fprintf(stderr, "buf[127] = %d\n", buf[127]);
-		}*/
-		
-		buf[++buflen] = '\0';
-		
-		/*if (buflen < 130 && buflen > 125)
-		{
-			fprintf(stderr, "nulled buf[%d]\n", buflen);
-			fprintf(stderr, "buf[127] = %d\n", buf[127]);
-		}*/
 
-
-		sc->buflen = buflen;
+		sc->buflen = buflen + 1;
 	}
 
 	return c;
