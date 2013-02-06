@@ -1,7 +1,14 @@
 #include "types.h"
 
-jchar bbuf[128] = "";
-int bbuf_len = 0;
+static int dtostr(jchar *save, double doble)
+{
+	return snprintf(save, 64, "%.3lf", doble);
+}
+
+static int ltostr(jchar *save, long integer)
+{
+	return snprintf(save, 64, "%ld", integer);
+}
 
 llm_t * new_llm(void *value, llm_t *next)
 {
@@ -34,9 +41,7 @@ pair_t * new_pair(jchar *key, thing_t *val)
 llm_t * addback(llm_t *last, void *add)
 {
 	llm_t *newllm = new_llm(add, NULL);
-	
-	if (newllm == NULL) return last;
-		
+	if (newllm == NULL) return last;	
 	if (last == NULL) 
 		last = newllm;
 	else
@@ -65,9 +70,10 @@ thing_t * new_string(jchar *stringval)
 thing_t * new_doble(double doble, int exponent)
 {
 	thing_t *newdob = NULL;
-
 	newdob = new_scal(Doble);
-	sa(newdob, stringval) = jstrtod(doble, NULL);
+	/* DECIMAL_DIG is from float.h in c99 */
+	sa(newdob, stringval) = c_malloc(DECIMAL_DIG);
+	dtostr(sa(newdob, stringval), doble);
 	sa(newdob, number.exponent) = exponent;
 
 	return newdob;
@@ -76,20 +82,11 @@ thing_t * new_doble(double doble, int exponent)
 thing_t * new_integer(long integer, int exponent)
 {
 	thing_t *newint = NULL;
-
 	newint = new_scal(Integer);
 	sa(newint, number.integer ) = integer;
 	sa(newint, number.exponent) = exponent;
 
 	return newint;
-}
-
-thing_t * new_bignum(jchar *stringrep)
-{
-	thing_t *newbn = new_scal(BigNum);
-	sa(newbn, string) = stringrep; 
-
-	return newbn;
 }
 
 thing_t * new_truthval(truthval_t tv)
@@ -201,9 +198,7 @@ pair_t * addkv(thing_t *object, pair_t *pair)
 pair_t * getobjval(thing_t *obj, jchar *key)
 {
 	llm_t *key_list = oa(obj, key_first);
-
 	pair_t *k = (pair_t *)key_list->data;
-
 	while (key_list != NULL)
 	{
 		/* Possible hash lookup here */

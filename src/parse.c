@@ -94,9 +94,9 @@ thing_t * string(parser_t *p)
 	error(p);
 }
 
-long get_exponent(parser_t *p)
+int get_exponent(parser_t *p)
 {
-	long exponent;
+	int exponent;
 	if (p->la == tExp)
 	{
 		exponent = jstrtol(p->scan->str, NULL, 0);
@@ -112,20 +112,16 @@ long get_exponent(parser_t *p)
 thing_t * integer(parser_t *p)
 {
 	thing_t *newint = new_scal(Integer);
-
 	jchar *copy = new_copy(p->scan->str, 0);
+	sa(newint, stringval) = copy;
 
-	sa(newint, number).integer = jstrtol(p->scan->str, NULL, 0);
+	errno = 0;
+	sa(newint, number).integer = jstrtol(copy, NULL, 0);
+
+	if (errno == ERANGE)
+		sa(newint, stype) = BigInt;
+	
 	match(tInteger);
-
-	if ((sa(newint, number).integer >= LONG_MAX 
-		|| sa(newint, number).integer <= LONG_MIN) 
-		&& errno == ERANGE)
-	{
-		sa(newint, stype) = BigNum;
-		sa(newint, stringval) = copy;
-	}
-
 	sa(newint, number).exponent = get_exponent(p);
 
 	return newint;
@@ -134,15 +130,17 @@ thing_t * integer(parser_t *p)
 thing_t * doble(parser_t *p)
 {
 	thing_t *newdob = new_scal(Doble);
-
 	jchar *copy = new_copy(p->scan->str, 0);
-
-	match(tDoble);
-
 	sa(newdob, stringval) = copy;
 
-	sa(newdob, number).exponent = get_exponent(p);
+	errno = 0;
+	sa(newdob, number).doble = jstrtod(copy, NULL);
 
+	if (errno == ERANGE)
+		sa(newdob, stype) = BigDob;
+
+	match(tDoble);
+	sa(newdob, number).exponent = get_exponent(p);
 	return newdob;
 }
 
@@ -164,20 +162,16 @@ thing_t * object(parser_t *p)
 		}
 		
 		match(tColon);
-
 		addkv(newobj, new_pair(key, thing(p)));
-
+		
 		if (p->la == tComma)
 			match(tComma);
 		else if (p->la == tRCurl)
 			break;
 		else
 			error(p);
-
 	}
-
 	match(tRCurl);
-
 	return newobj;
 }
 

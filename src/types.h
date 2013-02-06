@@ -7,6 +7,10 @@
 #include <string.h>
 #include "global.h"
 
+#ifndef DECIMAL_DIG
+ /* Approximates decimal-binary digit ratio */
+#define DECIMAL_DIG (sizeof(double)*8 / 3) 
+#endif
 
 #define ARR_A -1
 #define HT_THRESH 257
@@ -20,7 +24,7 @@
 
 typedef enum { Object, Array, Scalar   } type_t;	// Thing type
 
-typedef enum { String, Doble, Integer, BigNum, Truthval } stype_t;	// Scalar type
+typedef enum { String, Doble, Integer, BigInt, BigDob, Truthval } stype_t;	// Scalar type
 
 struct llm_t_st {	// General linked list member/data container.
 	void *data;
@@ -28,6 +32,15 @@ struct llm_t_st {	// General linked list member/data container.
 };
 typedef struct llm_t_st llm_t;
 
+
+/* Number in scientific notation. */
+struct number_t {
+	union {
+		double doble;
+		long integer;
+	};
+	int exponent;
+};
 
 /*  The main data type, thing_t, represents any JSON value.
 **  It's implemented as an anonymous union of anonymous structs 
@@ -40,13 +53,7 @@ struct thing_t_st {
 		struct {	/* Scalar */
 			union {
 				jchar *string;
-				struct {
-					union {
-						double 	doble;
-						long    integer;
-					};
-					long exponent;
-				} number;
+				struct number_t number;
 				truthval_t truthval;			
 			};
 			
