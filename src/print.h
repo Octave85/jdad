@@ -9,7 +9,6 @@
 
 #define BUFFER_START 1024
 
-#define del_printer(pr) c_free(pr)
 #define close_ostream(pr) fclose(pr->ostream)
 
 typedef enum { Pretty, Compact } printmode_t;
@@ -27,6 +26,7 @@ extern "C" {
 #endif // Prevent name-mangling
 
 printer_t * JDAD_DLL new_printer(FILE *, printmode_t);
+void JDAD_DLL del_printer(printer_t *);
 
 void JDAD_DLL print_scalar(printer_t *, thing_t *); 
 void JDAD_DLL print_arr(printer_t *, thing_t *); 

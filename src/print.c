@@ -15,6 +15,9 @@ printer_t * new_printer(FILE *ostream, printmode_t mode)
 	return newprinter;
 }
 
+void del_printer(printer_t *pr) { c_free(pr); }
+
+
 #define princ(PR_NAME, c) fputc(c, PR_NAME->ostream)
 #define print(...) fprintf(PR_NAME->ostream, __VA_ARGS__)
 #define inc_in(PR_NAME) (PR_NAME->level++)
