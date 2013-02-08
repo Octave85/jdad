@@ -85,6 +85,7 @@ thing_t * new_integer(long integer, int exponent)
 	newint = new_scal(Integer);
 	sa(newint, number.integer ) = integer;
 	sa(newint, number.exponent) = exponent;
+	ltostr(sa(newint, stringval), integer);
 
 	return newint;
 }
@@ -104,10 +105,18 @@ inline void del_scal(thing_t *scal)
 	/* Problem: these may or may not be malloc'd(),
 	** so we can get a segfault by freeing them.
 	*/
-	//if (sa(scal, stype) == String)
-	//{
-	//	c_free(sa(scal, string));
-	//}
+	switch(sa(scal, stype)) 
+	{
+	case String:
+		c_free(sa(scal, string));
+		break;
+	case Doble:
+	case Integer:
+	case BigInt:
+	case BigDob:
+		c_free(sa(scal, stringval));
+		break;
+	}
 
 	c_free(scal);
 }
@@ -219,6 +228,7 @@ void del_obj(thing_t *obj)
 	while (lm != NULL)
 	{
 		pair_t *pa = (pair_t *)lm->data;
+		c_free(pa->key);
 		del_thing(pa->val);
 		c_free(pa);
 
@@ -235,19 +245,19 @@ void del_thing(thing_t *t)
 {
 	switch (t->type)
 	{
-		case Scalar:
-			del_scal(t);
-			break;
+	case Scalar:
+		del_scal(t);
+		break;
 
-		case Array:
-			del_arr(t);
-			break;
+	case Array:
+		del_arr(t);
+		break;
 
-		case Object:
-			del_obj(t);
-			break;
+	case Object:		
+		del_obj(t);
+		break;
 
-		default:
-			printf("Illegal type for deletion\n");
+	default:
+		printf("Illegal type for deletion\n");
 	}
 }
