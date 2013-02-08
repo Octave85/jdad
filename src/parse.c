@@ -238,7 +238,6 @@ thing_t * thing(parser_t *p)
 		error(p);
 
 	case tEnd:
-		fprintf(stderr, "Got End from beggining parse\n");
 		return NULL;
 
 	default:
