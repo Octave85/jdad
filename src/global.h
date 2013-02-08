@@ -19,20 +19,9 @@
 
 #define array_length(arr) sizeof(arr)/sizeof(*arr)
 
-//#ifdef _WIN32 || _WIN64
-//	typedef unsigned int jchar;
-//#else
 #define jchar char
 
 #define _s(str) (jchar *)str
-//#endif
-
-extern int malloc_c;
-extern size_t mem_c;
-extern int free_c;
-
-extern jchar bbuf[128];
-extern int bbuf_len;
 
 enum Truthval_E { False, True, Null };
 typedef enum Truthval_E truthval_t;
@@ -56,16 +45,27 @@ typedef enum {
 extern "C" {
 #endif // Prevent name-mangling
 
+#define MEM_DEBUG
+
+#ifdef MEM_DEBUG
+
 void *c_malloc(size_t);
 void *c_calloc(size_t, size_t);
 void c_free(void *);
+void JDAD_DLL print_mem_use(void);
+
+#else
+
+#define c_malloc(sz) malloc(sz)
+#define c_calloc(ct, sz) calloc(ct, sz)
+#define c_free(bl) free(bl)
+
+#endif
 
 double jstrtod(jchar *, jchar **);
 long jstrtol(jchar *, jchar **, unsigned int);
 
-#define c_malloc(sz) malloc(sz)
-#define c_calloc(sz1, sz2) calloc(sz1, sz2)
-#define c_free(bl) free(bl)
+
 #define jstrtod(str, rest) strtod(str, rest)
 #define jstrtol(str, rest, base) strtol(str, rest, base)
 
