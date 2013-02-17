@@ -1,5 +1,3 @@
-#!/usr/bin/env
-
-gcc -c src/*.c -DBUILDING_JDAD_DLL
-gcc -shared -o jdad.dll *.o
+gcc -fPIC -c -O2 src/*.c -DBUILDING_JDAD_DLL
+gcc -shared -o libjdad.so.1 *.o
 rm *.o

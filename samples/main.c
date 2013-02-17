@@ -12,9 +12,11 @@ int main(int argc, char **argv)
 	}
 
 	parser_t *p = new_parser(argv[1]);
+	
+	
 	printer_t *print = new_printer(NULL, Pretty);
 
-	unsigned int level = 0, ctr = 0;
+	unsigned int ctr = 0;
 
 	register thing_t *t;
 
@@ -29,6 +31,8 @@ int main(int argc, char **argv)
 
 	del_printer(print);
 	parser_quit(p);
+
+	print_mem_use();
 
 	return 0; 
 }
