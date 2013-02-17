@@ -73,12 +73,17 @@ static const char state2str[][9] = {
 	"InN1", "InN2", "InN3",
 };
 
+enum scan_mode {
+	mode_file, mode_string, mode_undet,
+};
+
 typedef struct {
 	jchar *str;
 	unsigned int buflen;
 	state_t state;
 	unsigned int errors;
-	FILE *file;
+	void *in;
+	enum scan_mode mode;
 } scanner_t;
 
 

@@ -10,7 +10,7 @@
 
 #define match(t) p->la = _match(t, p)
 
-void error(parser_t *p)
+static void error(parser_t *p)
 {
 	printf("Unexpected %s %s, aborting\n",
 		tok2str[p->la], p->scan->str);
@@ -18,7 +18,7 @@ void error(parser_t *p)
 	exit(-1);
 }
 
-token_t  _match(token_t t, parser_t *p)
+static token_t  _match(token_t t, parser_t *p)
 {
 	if (p->la == t)
 		return scan_json(p->scan);
@@ -26,7 +26,7 @@ token_t  _match(token_t t, parser_t *p)
 		error(p);
 }
 
-jchar *new_copy(jchar *str, int len)
+static jchar *new_copy(jchar *str, int len)
 {
 	len = ( ! len) ? jstrlen(_s(str)) : len;
 
@@ -37,7 +37,7 @@ jchar *new_copy(jchar *str, int len)
 	return newcopy;
 }
 
-thing_t * truthval(parser_t *p)
+static thing_t * truthval(parser_t *p)
 {
 	thing_t *newtr = NULL;
 	switch (p->la)
@@ -66,7 +66,7 @@ thing_t * truthval(parser_t *p)
 	return newtr;
 }
 
-thing_t * string(parser_t *p)
+static thing_t * string(parser_t *p)
 {
 	if (p->la == tString)
 	{
@@ -94,7 +94,7 @@ thing_t * string(parser_t *p)
 	error(p);
 }
 
-int get_exponent(parser_t *p)
+static int get_exponent(parser_t *p)
 {
 	int exponent;
 	if (p->la == tExp)
@@ -109,7 +109,7 @@ int get_exponent(parser_t *p)
 	}
 }
 
-thing_t * integer(parser_t *p)
+static thing_t * integer(parser_t *p)
 {
 	thing_t *newint = new_scal(Integer);
 	jchar *copy = new_copy(p->scan->str, 0);
@@ -127,7 +127,7 @@ thing_t * integer(parser_t *p)
 	return newint;
 }
 
-thing_t * doble(parser_t *p)
+static thing_t * doble(parser_t *p)
 {
 	thing_t *newdob = new_scal(Doble);
 	jchar *copy = new_copy(p->scan->str, 0);
@@ -144,7 +144,7 @@ thing_t * doble(parser_t *p)
 	return newdob;
 }
 
-thing_t * object(parser_t *p)
+static thing_t * object(parser_t *p)
 {
 	thing_t *newobj = new_obj(0);
 	jchar *key;
@@ -175,7 +175,7 @@ thing_t * object(parser_t *p)
 	return newobj;
 }
 
-thing_t * array(parser_t *p)
+static thing_t * array(parser_t *p)
 {
 	thing_t *newarr = new_arr(0);
 
@@ -196,7 +196,7 @@ thing_t * array(parser_t *p)
 	return newarr;
 }
 
-thing_t * thing(parser_t *p)
+static thing_t * thing(parser_t *p)
 {
 	/* Can't just make this a case with fall-through... the p->la
 	** considered by the switch doesn't change to the newly-matched token.
@@ -248,14 +248,28 @@ thing_t * thing(parser_t *p)
 	return (thing_t *)NULL;
 }
 
-int parse(parser_t *p)
+
+/* These are the main interface parsing functions */
+
+thing_t * parse_json_file(parser_t *p, FILE *fh)
 {
+	p->scan->mode = mode_file;
+	p->scan->in = fh;
 	p->data = thing(p);
 
-	return (p->data != NULL);
+	return p->data;
 }
 
-parser_t *new_parser(jchar *filename)
+thing_t * parse_json_string(parser_t *p, jchar *str)
+{
+	p->scan->mode = mode_string;
+	p->scan->in = str;
+	p->data = thing(p);
+	
+	return p->data;
+}
+
+parser_t *new_json_parser(void)
 {
 	parser_t *newp = (parser_t *)c_malloc(sizeof(parser_t));
 
@@ -265,35 +279,39 @@ parser_t *new_parser(jchar *filename)
 		if (newp->scan)
 			newp->scan->str = 
 			(jchar *)c_calloc(SCANBUF_SIZE, sizeof(jchar));
+		newp->scan->mode = mode_undet;
 
-		newp->scan->file = open_json(filename);
-
+		newp->data = NULL;
 		newp->la = tBegin;
 	}
 
 	return newp;
 }
 
-inline int parse_eof(parser_t *p)
+inline int json_parser_eoi(parser_t *p)
 {
-	return feof(p->scan->file);
+	switch (p->scan->mode) {
+	case mode_file:
+		return feof((FILE *)p->scan->in);
+	case mode_string:
+		return (*((jchar *)p->scan->in) == '\0');
+	case mode_undet:
+		return 0;
+	default:
+		return 1;
+	}
 }
 
 parser_t *parser_reopen(parser_t *p, jchar *filename)
 {
-	p->scan->file = open_json(filename);
+	p->scan->in = (FILE *)open_json(filename);
 
 	return p;
 }
 
-void parser_quit(parser_t *p)
+void json_parser_quit(parser_t *p)
 {
-	if (p->data)
-		del_thing(p->data);
-
 	c_free(p->scan->str);
-
-	fclose(p->scan->file);
 
 	c_free(p->scan);
 

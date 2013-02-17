@@ -74,23 +74,6 @@ static int _addc(scanner_t *sc, int c)
 	return c;
 }
 
-static int _nextc(FILE *file, scanner_t *sc)
-{
-	unsigned int buflen = sc->buflen;
-	jchar *buf = sc->str;
-
-	int c = getc(file);
-
-	lineno += (c == '\n');
-
-	return c;
-}
-
-static inline int _prevc(int c, FILE *file)
-{
-	return ungetc(c, file);
-}
-
 static int _error(int c, scanner_t *sc)
 {
 	printf("Unexpected %c in stream at line %d (in state %s) (Had partial token %s)\n", 
@@ -100,124 +83,145 @@ static int _error(int c, scanner_t *sc)
 	return 1;
 }
 
-static void _schars(int c, FILE *file, jchar *str, unsigned int len)
+
+/* These are functions that deal with the input. The scanner needs them to know how to deal with the input. */
+static int _nextc_file(scanner_t *sc)
+{
+	int c;
+	c = getc((FILE *)sc->in);
+	lineno += (c == '\n');
+	return c;
+}
+
+static int _nextc_string(scanner_t *sc)
+{
+	int c;
+	c = *((jchar *)sc->in++);
+	lineno += (c == '\n');
+	return c;
+}
+
+static inline int _prevc_file(int c, scanner_t *sc)
+{
+	return ungetc(c, (FILE *)sc->in);
+}
+
+static inline int _prevc_string(int c, scanner_t *sc)
+{
+
+	sc->in--;
+	return *((jchar *)sc->in);
+}
+
+static inline void _schars_file(int c, scanner_t *sc)
 {
 	// Skip spaces
 	while (isspace(c))
 	{
-		c = getc(file);
+		c = _nextc_file(sc);
 	}
 	// Put back first nonspace
-	_prevc(c, file);
+	_prevc_file(c, sc);
 }
 
-token_t scan_json(scanner_t *sc)
+static inline void _schars_string(int c, scanner_t *sc)
 {
-/* Function-specific macros */
-#define SCAN_NAME sc
+	while (isspace(c))
+	{
+		c = _nextc_string(sc);
+	}
 
-#define add_nextc() _addc(SCAN_NAME, _nextc(SCAN_NAME->file, SCAN_NAME))
-#define nextc() _nextc(SCAN_NAME->file, SCAN_NAME)
-#define addc(c) _addc(SCAN_NAME, c)
-#define prevc() _prevc(c, SCAN_NAME->file)
-#define schars() _schars(c, SCAN_NAME->file, SCAN_NAME->str, SCAN_NAME->buflen)
-#define error() _error(c, SCAN_NAME)
+	_prevc_string(c, sc);
+}
+
+
+/* This is the JSON DFA. It interacts directly with the input. */
+static token_t __scan_json(scanner_t *sc, int (*_nextc)(scanner_t *), int (*_prevc)(int, scanner_t *), void (*_schars)(int, scanner_t *))
+{
+	token_t tok;
+	state_t *state = &(sc->state);
+	int c = 0;
+
+	*state = Start;
+
+#define addc(c) _addc(sc, c)
+#define nextc() _nextc(sc)
+#define prevc(c) _prevc(c, sc)
+#define schars() _schars(c, sc)
+#define error() _error(c, sc)
 
 #define unex() do { error(); *state = Error; tok = tErr; } while (0)
 #define accept(tt) do { *state = Accept; tok = tt; } while (0)
-#define accept_pb(tt) do { prevc(); accept(tt); } while (0)
-
-	token_t tok;
-	state_t *state = &(sc->state);
-	*state = Start;
-
-	int c;
-	memset(sc->str, 0, SCANBUF_SIZE);
-	sc->buflen = 0;
+#define accept_pb(tt) do { prevc(c); accept(tt); } while (0)
 
 	for (;;)
 	{
-		
 		switch (*state)
 		{
 		case Start:
 			c = nextc();
-
 			switch (c)
 			{
-				
 			case '{':
 				accept(tLCurl);
 				addc(c);
 				break;
-
 			case '}':
 				accept(tRCurl);
 				addc(c);
 				break;
-
 			case ',':
 				accept(tComma);
 				addc(c);
 				break;
-
 			case '[':
 				accept(tLBrace);
 				addc(c);
 				break;
-
 			case ']':
 				accept(tRBrace);
 				addc(c);
 				break;
-
 			case '"':
 				tok = tString;
 				*state = InStr;
 				break;
-
 			case ':':
 				accept(tColon);
 				addc(c);
 				break;
-			
 			case 'T':
 			case 't':
 				*state = InT1;
 				tok = tTrue;
 				addc(c);
 				break;
-
 			case 'F':
 			case 'f':
 				*state = InF1;
 				tok = tFalse;
 				addc(c);
 				break;
-
 			case 'N':
 			case 'n':
 				*state = InN1;
 				tok = tNull;
 				addc(c);
 				break;
-
 			case '.':
 			case '-':
 			// digit case handled after
 				addc(c);
 				*state = StartNum;
 				break;
-
 			case 'e':
 			case 'E':
 				*state = StartExp;
 				break;
-
 			case EOF:
-				accept(tEnd);
+			case '\0':
+				accept_pb(tEnd);
 				break;
-
 			default:
 				if (isspace(c))
 				{
@@ -233,25 +237,19 @@ token_t scan_json(scanner_t *sc)
 					unex();
 				}
 			}
-
 			break;
-		
 		case Accept:
 		case Error:
 			return tok;
-
 		case StartNum:
 			c = nextc();
-
 			switch (c)
 			{
 			case '.':
 				*state = InFrac;
 				tok = tDoble;
-
 				addc(c);
 				break;
-
 			default:
 				if (isdigit(c) || c == '-')
 				{
@@ -264,10 +262,8 @@ token_t scan_json(scanner_t *sc)
 				}
 			}
 			break; // StartNum
-
 		case InNum:
 			c = nextc();
-
 			switch (c)
 			{
 			case '.':
@@ -275,7 +271,6 @@ token_t scan_json(scanner_t *sc)
 				addc(c);
 				tok = tDoble;
 				break;
-
 			default:
 				if (isdigit(c))
 					addc(c);
@@ -283,16 +278,13 @@ token_t scan_json(scanner_t *sc)
 					accept_pb(tInteger);
 			}
 			break; // InNum
-
 		case InFrac:
 			c = nextc();
-
 			switch (c)
 			{
 			case '.':
 				unex();
 				break;
-
 			default:
 				if (isdigit(c))
 					addc(c);
@@ -300,7 +292,6 @@ token_t scan_json(scanner_t *sc)
 					accept_pb(tDoble);
 			}
 			break; //InFrac
-
 		case StartExp:
 			c = nextc();
 			if (isdigit(c))
@@ -311,7 +302,6 @@ token_t scan_json(scanner_t *sc)
 			else if (c == '-' || c == '+')
 			{
 				addc(c);
-				
 				// Check to see there is at least one digit
 				c = nextc();
 				if (isdigit(c))
@@ -324,10 +314,7 @@ token_t scan_json(scanner_t *sc)
 					unex();
 				}
 			}			
-
 			break; // StartExp
-
-
 		case InExp:
 			c = nextc();
 			switch (c)
@@ -335,16 +322,13 @@ token_t scan_json(scanner_t *sc)
 			case_digit:	// Stay in this state
 				addc(c);
 				break;
-
 			case '.':
 				unex();
 				break;
-
 			default:
 				accept_pb(tExp);
 			}
 			break; // InExp
-
 		case InStr:
 			c = nextc();
 			switch (c)
@@ -352,19 +336,15 @@ token_t scan_json(scanner_t *sc)
 			case '\\':
 				*state = InEscape;
 				break;
-
 			case '"':
 				accept(tString);
 				break;
-
 			case EOF:
 				unex();
-
 			default:
 				addc(c);
 			}
 			break; // InStr
-
 		case InEscape:
 			c = nextc();
 			switch (c)
@@ -403,12 +383,10 @@ token_t scan_json(scanner_t *sc)
 tostr:			
 			*state = InStr;
 			break; // InEscape
-
 		case InHex:
 			c = nextc();
 			int hex;
 			hex = 0;
-			
 			if (isxdigit(c))
 				hex |= (char2hex(c) << 12);
 			else
@@ -428,13 +406,9 @@ tostr:
 				hex |= char2hex(c);
 			else
 				unex();
-
 			addc(hex);
-			
 			*state = InStr;
-			
 			break; // InHex
-
 		case InT1:
 			c = nextc();
 			if (c == 'R' || c == 'r')
@@ -447,7 +421,6 @@ tostr:
 				unex();
 			}
 			break; // InT1
-
 		case InT2:
 			c = nextc();
 			if (c == 'U' || c == 'u')
@@ -460,7 +433,6 @@ tostr:
 				unex();
 			}
 			break; // InT2
-
 		case InT3:	
 			c = nextc();
 			if (c == 'E' || c == 'e')
@@ -473,7 +445,6 @@ tostr:
 				unex();
 			}
 			break; // InT3
-
 		case InF1:
 			c = nextc();
 			if (c == 'A' || c == 'a')
@@ -486,7 +457,6 @@ tostr:
 				unex();
 			}
 			break; // InF1
-
 		case InF2:
 			c = nextc();
 			if (c == 'L' || c == 'l')
@@ -499,7 +469,6 @@ tostr:
 				unex();
 			}
 			break; // InF2
-
 		case InF3:	
 			c = nextc();
 			if (c == 'S' || c == 's')
@@ -512,7 +481,6 @@ tostr:
 				unex();
 			}
 			break; // InF3
-
 		case InF4:
 			c = nextc();
 			if (c == 'E' || c == 'e')
@@ -525,7 +493,6 @@ tostr:
 				unex();
 			}
 			break; // InF4
-
 		case InN1:
 			c = nextc();
 			if (c == 'U' || c == 'u')
@@ -538,7 +505,6 @@ tostr:
 				unex();
 			}
 			break; // InN1
-
 		case InN2:
 			c = nextc();
 			if (c == 'L' || c == 'l')
@@ -551,7 +517,6 @@ tostr:
 				unex();
 			}
 			break; // InN2
-
 		case InN3:	
 			c = nextc();
 			if (c == 'L' || c == 'l')
@@ -564,15 +529,35 @@ tostr:
 				unex();
 			}
 			break; // InN3;
-
 		default:
 			printf("Internal error: unexpected state %d\n", *state);
 			return tErr;
-
-	
 		// End of state switch
 		}
-	
 	// End of for loop
 	}
+}
+
+static inline token_t scan_json_file(scanner_t *sc)
+{
+	memset(sc->str, 0, SCANBUF_SIZE);
+	sc->buflen = 0;
+
+	return __scan_json(sc, _nextc_file, _prevc_file, _schars_file);
+}
+
+static inline token_t scan_json_string(scanner_t *sc)
+{
+	memset(sc->str, 0, SCANBUF_SIZE);
+	sc->buflen = 0;
+
+	return __scan_json(sc, _nextc_string, _prevc_string, _schars_string);
+}
+
+token_t scan_json(scanner_t *sc)
+{
+	if (sc->mode == mode_file)
+		return scan_json_file(sc);
+	else
+		return scan_json_string(sc);
 }

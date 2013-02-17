@@ -31,16 +31,17 @@ typedef struct {
 extern "C" {
 #endif // Prevent name-mangling
 
-parser_t * JDAD_DLL new_parser(jchar *);
-int JDAD_DLL parse(parser_t *);
-int JDAD_DLL parse_eof(parser_t *);
+parser_t * JDAD_DLL new_json_parser();
+thing_t * JDAD_DLL parse_json_file(parser_t *, FILE *);
+thing_t * JDAD_DLL parse_json_string(parser_t *, jchar *);
+int JDAD_DLL parse_eoi(parser_t *);
 parser_t * JDAD_DLL parser_reopen(parser_t *, jchar *);
 void JDAD_DLL parser_quit(parser_t *);
 
-thing_t * thing(parser_t *);
-thing_t * object(parser_t *);
-thing_t * string(parser_t *);
-thing_t * doble(parser_t *);
+static thing_t * thing(parser_t *);
+static thing_t * object(parser_t *);
+static thing_t * string(parser_t *);
+static thing_t * doble(parser_t *);
 
 #ifdef __cplusplus
 }
