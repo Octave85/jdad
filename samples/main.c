@@ -11,7 +11,15 @@ int main(int argc, char **argv)
 		exit(-1);
 	}
 
-	parser_t *p = new_parser(argv[1]);
+	FILE *in = fopen(argv[1], "r");
+
+	if (in == NULL)
+	{
+		fprintf(stderr, "Error opening %s\n", argv[1]);
+		exit(-1);
+	}
+
+	parser_t *p = new_json_parser();
 	
 	
 	printer_t *print = new_printer(NULL, Pretty);
@@ -20,9 +28,9 @@ int main(int argc, char **argv)
 
 	register thing_t *t;
 
-	while (parse(p))
+	while (! json_parser_eoi(p))
 	{
-		t = p->data;
+		t = parse_json_file(p, in); 
 
 		fprintf(stderr, "[%d]\n", ctr++);
 		print_thing(print, t);
@@ -30,7 +38,7 @@ int main(int argc, char **argv)
 	}
 
 	del_printer(print);
-	parser_quit(p);
+	json_parser_quit(p);
 
 	print_mem_use();
 
