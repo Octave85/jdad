@@ -1,6 +1,6 @@
 #include "print.h"
 
-printer_t * new_printer(FILE *ostream, printmode_t mode)
+printer_t * new_json_printer(FILE *ostream, printmode_t mode)
 {
 	printer_t *newprinter = (printer_t *)c_malloc(sizeof(printer_t));
 
@@ -15,7 +15,7 @@ printer_t * new_printer(FILE *ostream, printmode_t mode)
 	return newprinter;
 }
 
-void del_printer(printer_t *pr) { c_free(pr); }
+void del_json_printer(printer_t *pr) { c_free(pr); }
 
 
 #define princ(PR_NAME, c) fputc(c, PR_NAME->ostream)
@@ -31,7 +31,7 @@ void del_printer(printer_t *pr) { c_free(pr); }
 
 #define nl(PR_NAME) princ(PR_NAME, '\n')
 
-void in(printer_t *pr)
+static inline void in(printer_t *pr)
 {
 	unsigned int lvl = pr->level;
 	while (lvl--) print("  ");
@@ -51,7 +51,7 @@ void in(printer_t *pr)
 #define nl(PR_NAME) if (PR_NAME->donl) princ(PR_NAME, '\n')
 #define SPACE ((PR_NAME->doin) ? " " : "")
 
-void in(printer_t *pr)
+static inline void in(printer_t *pr)
 {
 	if (PR_NAME->doin)
 	{
@@ -63,7 +63,7 @@ void in(printer_t *pr)
 
 
 
-void print_scalar(printer_t *pr, thing_t *sc)
+static void print_scalar(printer_t *pr, thing_t *sc)
 {
 	switch (sa(sc, stype))
 	{
@@ -106,10 +106,10 @@ print_exp:
 	}
 }
 
-void print_obj(printer_t *pr, thing_t *obj)
+static void print_obj(printer_t *pr, thing_t *obj)
 {
 #define pair_print(pair) do { print("\"%s\":%s", k->key, SPACE); \
-	print_thing(pr, k->val); } while (0)
+	print_json_thing(pr, k->val); } while (0)
 #define pair_print_c(pair) do { pair_print(pair); princ(pr, ','); } while (0)
 
 	llm_t *key_list = oa(obj, key_first);
@@ -147,10 +147,9 @@ void print_obj(printer_t *pr, thing_t *obj)
 #undef pair_print
 }
 
-
-void print_arr(printer_t *pr, thing_t *arr)
+static void print_arr(printer_t *pr, thing_t *arr)
 {
-#define el_print(lm) do { print_thing(pr, (thing_t *)lm->data); } while(0)
+#define el_print(lm) do { print_json_thing(pr, (thing_t *)lm->data); } while(0)
 #define el_print_c(lm) do { el_print(lm); princ(pr, ','); } while(0)	
 
 	print("[");
@@ -186,7 +185,7 @@ void print_arr(printer_t *pr, thing_t *arr)
 }
 
 
-void print_thing(printer_t *pr, thing_t *thing)
+void print_json_thing(printer_t *pr, thing_t *thing)
 {
 	switch (thing->type)
 	{

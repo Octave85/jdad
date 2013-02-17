@@ -10,7 +10,7 @@ static int ltostr(jchar *save, long integer)
 	return snprintf(save, 64, "%ld", integer);
 }
 
-llm_t * new_llm(void *value, llm_t *next)
+static llm_t * new_llm(void *value, llm_t *next)
 {
 	llm_t *newllm = 
 		(llm_t *)c_malloc(sizeof(llm_t));
@@ -24,7 +24,7 @@ llm_t * new_llm(void *value, llm_t *next)
 	return newllm;
 }
 
-pair_t * new_pair(jchar *key, thing_t *val)
+pair_t * new_json_obj_pair(jchar *key, thing_t *val)
 {
 	pair_t *newpair = 
 		(pair_t *)c_malloc(sizeof(pair_t));
@@ -38,7 +38,7 @@ pair_t * new_pair(jchar *key, thing_t *val)
 	return newpair;
 }
 
-llm_t * addback(llm_t *last, void *add)
+static llm_t * addback(llm_t *last, void *add)
 {
 	llm_t *newllm = new_llm(add, NULL);
 	if (newllm == NULL) return last;	
@@ -50,7 +50,7 @@ llm_t * addback(llm_t *last, void *add)
 	return newllm;
 }
 
-thing_t * new_scal(stype_t type)
+thing_t * new_json_scal(stype_t type)
 {
 	thing_t *newscal = (thing_t *)c_malloc(sizeof(thing_t));
 	newscal->type = Scalar;
@@ -59,18 +59,18 @@ thing_t * new_scal(stype_t type)
 	return newscal;
 }
 
-thing_t * new_string(jchar *stringval)
+thing_t * new_json_string(jchar *stringval)
 {
-	thing_t *newstr = new_scal(String);
+	thing_t *newstr = new_json_scal(String);
 	sa(newstr, string) = stringval;
 
 	return newstr;
 }
 
-thing_t * new_doble(double doble, int exponent)
+thing_t * new_json_doble(double doble, int exponent)
 {
 	thing_t *newdob = NULL;
-	newdob = new_scal(Doble);
+	newdob = new_json_scal(Doble);
 	/* DECIMAL_DIG is from float.h in c99 */
 	sa(newdob, stringval) = c_malloc(DECIMAL_DIG);
 	dtostr(sa(newdob, stringval), doble);
@@ -79,10 +79,10 @@ thing_t * new_doble(double doble, int exponent)
 	return newdob;
 }
 
-thing_t * new_integer(long integer, int exponent)
+thing_t * new_json_integer(long integer, int exponent)
 {
 	thing_t *newint = NULL;
-	newint = new_scal(Integer);
+	newint = new_json_scal(Integer);
 	sa(newint, number.integer ) = integer;
 	sa(newint, number.exponent) = exponent;
 	ltostr(sa(newint, stringval), integer);
@@ -90,17 +90,17 @@ thing_t * new_integer(long integer, int exponent)
 	return newint;
 }
 
-thing_t * new_truthval(truthval_t tv)
+thing_t * new_json_truthval(truthval_t tv)
 {
 	thing_t *newtv = NULL;
 
-	newtv = new_scal(Truthval);
+	newtv = new_json_scal(Truthval);
 	sa(newtv, truthval) = tv;
 
 	return newtv;
 }
 
-inline void del_scal(thing_t *scal)
+static inline void del_json_scal(thing_t *scal)
 {
 	/* Problem: these may or may not be malloc'd(),
 	** so we can get a segfault by freeing them.
@@ -121,7 +121,7 @@ inline void del_scal(thing_t *scal)
 	c_free(scal);
 }
 
-thing_t * new_arr(unsigned int maxlength)
+thing_t * new_json_arr(unsigned int maxlength)
 {
 	thing_t *newarr;
 	newarr = (thing_t *)c_malloc(sizeof(*newarr));
@@ -135,7 +135,7 @@ thing_t * new_arr(unsigned int maxlength)
 	return newarr;
 }
 
-int addelem(thing_t *arr, thing_t *value)
+int json_arr_add_elem(thing_t *arr, thing_t *value)
 {
 	aa(arr, c_last) = addback(oa(arr, c_last), value);
 
@@ -147,7 +147,7 @@ int addelem(thing_t *arr, thing_t *value)
 	return 1;
 }
 
-thing_t * getarrval(thing_t *arr, unsigned int ind)
+thing_t * get_json_arr_val(thing_t *arr, unsigned int ind)
 {
 	llm_t *cur = oa(arr, c_first);
 
@@ -157,7 +157,7 @@ thing_t * getarrval(thing_t *arr, unsigned int ind)
 	return (thing_t *)cur->data;
 }
 
-void del_arr(thing_t *arr)
+static void del_json_arr(thing_t *arr)
 {
 	llm_t *lm = aa(arr, c_first), *next;
 	thing_t *del;
@@ -165,7 +165,7 @@ void del_arr(thing_t *arr)
 	while (lm != NULL)
 	{
 		del = (thing_t *)lm->data;
-		del_thing(del);
+		del_json_thing(del);
 
 		next = lm->next;
 		c_free(lm);
@@ -176,7 +176,7 @@ void del_arr(thing_t *arr)
 }
 
 
-thing_t * new_obj(unsigned int length)
+thing_t * new_json_obj(unsigned int length)
 {
 	thing_t *newobj; 
 	newobj = (thing_t *)c_malloc(sizeof(*newobj));
@@ -192,7 +192,7 @@ thing_t * new_obj(unsigned int length)
 	return newobj;
 }
 
-pair_t * addkv(thing_t *object, pair_t *pair)
+pair_t * json_obj_add_pair(thing_t *object, pair_t *pair)
 {
 	oa(object, key_last) = addback(oa(object, key_last), pair);
 	
@@ -204,7 +204,7 @@ pair_t * addkv(thing_t *object, pair_t *pair)
 	return pair;
 }
 
-pair_t * getobjval(thing_t *obj, jchar *key)
+pair_t * get_json_obj_val(thing_t *obj, jchar *key)
 {
 	llm_t *key_list = oa(obj, key_first);
 	pair_t *k = (pair_t *)key_list->data;
@@ -221,7 +221,7 @@ pair_t * getobjval(thing_t *obj, jchar *key)
 	return k;
 }
 
-void del_obj(thing_t *obj)
+static void del_json_obj(thing_t *obj)
 {
 	llm_t *lm = oa(obj, key_first), *next;
 	
@@ -229,7 +229,7 @@ void del_obj(thing_t *obj)
 	{
 		pair_t *pa = (pair_t *)lm->data;
 		c_free(pa->key);
-		del_thing(pa->val);
+		del_json_thing(pa->val);
 		c_free(pa);
 
 		next = lm->next;
@@ -241,20 +241,20 @@ void del_obj(thing_t *obj)
 	c_free(obj);
 }
 
-void del_thing(thing_t *t)
+void del_json_thing(thing_t *t)
 {
 	switch (t->type)
 	{
 	case Scalar:
-		del_scal(t);
+		del_json_scal(t);
 		break;
 
 	case Array:
-		del_arr(t);
+		del_json_arr(t);
 		break;
 
 	case Object:		
-		del_obj(t);
+		del_json_obj(t);
 		break;
 
 	default:

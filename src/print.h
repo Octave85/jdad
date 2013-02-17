@@ -25,13 +25,10 @@ typedef struct printer_t_st printer_t;
 extern "C" {
 #endif // Prevent name-mangling
 
-printer_t * JDAD_DLL new_printer(FILE *, printmode_t);
-void JDAD_DLL del_printer(printer_t *);
+printer_t * JDAD_DLL new_json_printer(FILE *, printmode_t);
+void JDAD_DLL del_json_printer(printer_t *);
 
-void JDAD_DLL print_scalar(printer_t *, thing_t *); 
-void JDAD_DLL print_arr(printer_t *, thing_t *); 
-void JDAD_DLL print_obj(printer_t *, thing_t *); 
-void JDAD_DLL print_thing(printer_t *, thing_t *); 
+void JDAD_DLL print_json_thing(printer_t *, thing_t *); 
 
 #ifdef __cplusplus
 }

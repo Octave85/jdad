@@ -92,28 +92,23 @@ typedef struct pair_t_st pair_t;
 extern "C" {
 #endif // Prevent name-mangling
 
-llm_t *new_llm(void *, llm_t *);
+thing_t * JDAD_DLL new_json_scal(stype_t);
+thing_t * JDAD_DLL new_json_string(jchar *);
+thing_t * JDAD_DLL new_json_doble(double, int);
+thing_t * JDAD_DLL new_json_integer(long, int);
+thing_t * JDAD_DLL new_json_bignum(jchar *);
+thing_t * JDAD_DLL new_json_truthval(truthval_t);
 
-thing_t * JDAD_DLL new_scal(stype_t);
-thing_t * JDAD_DLL new_string(jchar *);
-thing_t * JDAD_DLL new_doble(double, int);
-thing_t * JDAD_DLL new_integer(long, int);
-thing_t * JDAD_DLL new_bignum(jchar *);
-thing_t * JDAD_DLL new_truthval(truthval_t);
-void JDAD_DLL del_scal(thing_t *);
+thing_t * JDAD_DLL new_json_arr(unsigned int);
+int JDAD_DLL json_arr_add_elem(thing_t *, thing_t *);
+thing_t * JDAD_DLL get_json_arr_val(thing_t *, unsigned int);
 
-thing_t * JDAD_DLL new_arr(unsigned int);
-int JDAD_DLL addelem(thing_t *, thing_t *);
-thing_t * JDAD_DLL getarrval(thing_t *, unsigned int);
-void JDAD_DLL del_arr(thing_t *);
+thing_t * JDAD_DLL new_json_obj(unsigned int);
+pair_t * JDAD_DLL json_obj_add_pair(thing_t *, pair_t *);
+pair_t * JDAD_DLL get_json_obj_val(thing_t *, jchar *);
+pair_t * JDAD_DLL new_json_obj_pair(jchar *, thing_t *);
 
-thing_t * JDAD_DLL new_obj(unsigned int);
-pair_t * JDAD_DLL addkv(thing_t *, pair_t *);
-pair_t * JDAD_DLL getobjval(thing_t *, jchar *);
-pair_t * JDAD_DLL new_pair(jchar *, thing_t *);
-void JDAD_DLL del_obj(thing_t *);
-
-void JDAD_DLL del_thing(thing_t *);
+void JDAD_DLL del_json_thing(thing_t *);
 
 #ifdef __cplusplus
 }

@@ -136,7 +136,10 @@ static inline void _schars_string(int c, scanner_t *sc)
 
 
 /* This is the JSON DFA. It interacts directly with the input. */
-static token_t __scan_json(scanner_t *sc, int (*_nextc)(scanner_t *), int (*_prevc)(int, scanner_t *), void (*_schars)(int, scanner_t *))
+static token_t __scan_json(scanner_t *sc, 
+		int (*_nextc)(scanner_t *), 
+		int (*_prevc)(int, scanner_t *), 
+		void (*_schars)(int, scanner_t *))
 {
 	token_t tok;
 	state_t *state = &(sc->state);

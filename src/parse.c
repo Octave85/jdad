@@ -44,17 +44,17 @@ static thing_t * truthval(parser_t *p)
 	{
 		case tTrue:
 			match(tTrue);
-			newtr = new_scal(Truthval);
+			newtr = new_json_scal(Truthval);
 			sa(newtr, truthval) = True;
 			break;
 		case tFalse:
 			match(tFalse);
-			newtr = new_scal(Truthval);
+			newtr = new_json_scal(Truthval);
 			sa(newtr, truthval) = False;
 			break;
 		case tNull:
 			match(tNull);
-			newtr = new_scal(Truthval);
+			newtr = new_json_scal(Truthval);
 			sa(newtr, truthval) = Null;
 			break;
 		default:
@@ -73,18 +73,10 @@ static thing_t * string(parser_t *p)
 		// Get rid of quotes
 		jchar *copy = copy_sansquotes(p->scan->str, p->scan->buflen);
 
-		thing_t *newstr = new_scal(String);
+		thing_t *newstr = new_json_scal(String);
 
 		sa(newstr, string) = copy;
 		sa(newstr, len) = p->scan->buflen;
-
-		/*printf("\nHex contents(2): ");
-		int i;
-		for (i = 0; i < p->scan->buflen; i++)
-			if (p->scan->str[i] == 0)
-				printf("NUL at %d\n", i);
-		*/
-		
 
 		match(tString);
 
@@ -111,7 +103,7 @@ static int get_exponent(parser_t *p)
 
 static thing_t * integer(parser_t *p)
 {
-	thing_t *newint = new_scal(Integer);
+	thing_t *newint = new_json_scal(Integer);
 	jchar *copy = new_copy(p->scan->str, 0);
 	sa(newint, stringval) = copy;
 
@@ -129,7 +121,7 @@ static thing_t * integer(parser_t *p)
 
 static thing_t * doble(parser_t *p)
 {
-	thing_t *newdob = new_scal(Doble);
+	thing_t *newdob = new_json_scal(Doble);
 	jchar *copy = new_copy(p->scan->str, 0);
 	sa(newdob, stringval) = copy;
 
@@ -141,12 +133,13 @@ static thing_t * doble(parser_t *p)
 
 	match(tDoble);
 	sa(newdob, number).exponent = get_exponent(p);
+
 	return newdob;
 }
 
 static thing_t * object(parser_t *p)
 {
-	thing_t *newobj = new_obj(0);
+	thing_t *newobj = new_json_obj(0);
 	jchar *key;
 
 	while (p->la != tRCurl)
@@ -162,7 +155,7 @@ static thing_t * object(parser_t *p)
 		}
 		
 		match(tColon);
-		addkv(newobj, new_pair(key, thing(p)));
+		json_obj_add_pair(newobj, new_json_obj_pair(key, thing(p)));
 		
 		if (p->la == tComma)
 			match(tComma);
@@ -177,11 +170,11 @@ static thing_t * object(parser_t *p)
 
 static thing_t * array(parser_t *p)
 {
-	thing_t *newarr = new_arr(0);
+	thing_t *newarr = new_json_arr(0);
 
 	while (p->la != tRBrace)
 	{
-		addelem(newarr, thing(p));
+		json_arr_add_elem(newarr, thing(p));
 
 		if (p->la == tComma)
 			match(tComma);
